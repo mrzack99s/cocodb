@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* The dashboard's zinc utilities were authored for the dark interface. Map
+   those surfaces and text colors when the app switches the root to .light. */
+html.light {
+  color-scheme: light;
+  background: #f4f4f5;
+}
+
+html.light body {
+  background: #f4f4f5;
+}
+
+html.light .bg-zinc-950,
+html.light [class~="bg-zinc-950/60"],
+html.light [class~="bg-zinc-950/80"] {
+  background-color: #f4f4f5;
+}
+
+html.light .bg-zinc-900,
+html.light [class~="bg-zinc-900/60"] {
+  background-color: #ffffff;
+}
+
+html.light .bg-zinc-800,
+html.light [class~="bg-zinc-800/30"] {
+  background-color: #e4e4e7;
+}
+
+html.light .border-zinc-800,
+html.light [class~="border-zinc-800/60"],
+html.light [class~="border-zinc-800/80"],
+html.light .divide-zinc-800 > :not(:last-child) {
+  border-color: #d4d4d8;
+}
+
+html.light .border-zinc-700 {
+  border-color: #d4d4d8;
+}
+
+html.light .text-zinc-100,
+html.light .text-zinc-200,
+html.light .text-zinc-300,
+html.light .text-white {
+  color: #18181b;
+}
+
+html.light .text-zinc-400 {
+  color: #52525b;
+}
+
+html.light .text-zinc-500,
+html.light .text-zinc-600 {
+  color: #71717a;
+}
+
+/* Preserve contrast for the two solid action buttons. */
+html.light .bg-indigo-600.text-white,
+html.light .bg-emerald-500 .text-zinc-950 {
+  color: #ffffff;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.4);
+}
