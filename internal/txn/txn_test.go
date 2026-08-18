@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"testing"
 
-	"cocodb/internal/file"
-	"cocodb/internal/record"
-	"cocodb/internal/storage"
-	"cocodb/internal/txn"
-	"cocodb/internal/wal"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/record"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/wal"
 )
 
 func TestSnapshotIsolationAndVersionChains(t *testing.T) {

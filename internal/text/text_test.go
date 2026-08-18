@@ -3,7 +3,7 @@ package text_test
 import (
 	"testing"
 
-	"cocodb/internal/text"
+	"github.com/mrzack99s/cocodb/internal/text"
 )
 
 func TestTokenizerAndBM25(t *testing.T) {

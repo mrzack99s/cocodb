@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // CacheEntry represents a cached page node in the LRU shard.

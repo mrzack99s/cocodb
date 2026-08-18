@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	internalCluster "cocodb/internal/cluster"
-	"cocodb/queue"
+	internalCluster "github.com/mrzack99s/cocodb/internal/cluster"
+	"github.com/mrzack99s/cocodb/queue"
 )
 
 // Queue provides access to a distributed task queue with consistent hash routing.

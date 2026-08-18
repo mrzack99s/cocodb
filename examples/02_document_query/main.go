@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	coco "cocodb"
-	"cocodb/document"
+	coco "github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/document"
 )
 
 func main() {

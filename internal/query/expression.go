@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"cocodb/internal/cson"
+	"github.com/mrzack99s/cocodb/internal/cson"
 )
 
 // Expression evaluates a boolean predicate against a DocumentView.

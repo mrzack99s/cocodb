@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"cocodb/search"
+	"github.com/mrzack99s/cocodb/search"
 )
 
 func main() {

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/file"
-	"cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/storage"
 )
 
 func TestKeyEncodingOrder(t *testing.T) {

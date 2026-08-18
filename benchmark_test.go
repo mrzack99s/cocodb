@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	coco "cocodb"
-	"cocodb/internal/vector"
-	"cocodb/search"
+	coco "github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/internal/vector"
+	"github.com/mrzack99s/cocodb/search"
 )
 
 func BenchmarkKV_Put(b *testing.B) {

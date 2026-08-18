@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	internalCluster "cocodb/internal/cluster"
+	internalCluster "github.com/mrzack99s/cocodb/internal/cluster"
 )
 
 // NodeConfig contains settings for starting a cluster node.

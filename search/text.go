@@ -1,7 +1,7 @@
 package search
 
 import (
-	internalText "cocodb/internal/text"
+	internalText "github.com/mrzack99s/cocodb/internal/text"
 )
 
 type InvertedIndex = internalText.InvertedIndex

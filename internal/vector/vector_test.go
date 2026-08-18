@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"cocodb/internal/vector"
+	"github.com/mrzack99s/cocodb/internal/vector"
 )
 
 func TestVectorDistancesAndHNSW(t *testing.T) {

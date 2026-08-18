@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Decode unpacks a full CSON byte slice into a Go map[string]any.

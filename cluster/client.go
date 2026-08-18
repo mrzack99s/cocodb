@@ -3,7 +3,7 @@ package cluster
 import (
 	"context"
 
-	internalCluster "cocodb/internal/cluster"
+	internalCluster "github.com/mrzack99s/cocodb/internal/cluster"
 )
 
 // Client is a thread-safe client connected to a CoCoDB cluster with consistent hash routing.

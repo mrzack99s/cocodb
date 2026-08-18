@@ -3,7 +3,7 @@ package cocodb
 import (
 	"errors"
 
-	internalQueue "cocodb/internal/queue"
+	internalQueue "github.com/mrzack99s/cocodb/internal/queue"
 )
 
 var (

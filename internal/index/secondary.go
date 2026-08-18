@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/cson"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/cson"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // IndexDefinition configures a secondary index.

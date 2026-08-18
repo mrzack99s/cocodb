@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"cocodb"
+	"github.com/mrzack99s/cocodb"
 )
 
 // Server represents the standalone CoCoDB Observability & Metrics Dashboard server.

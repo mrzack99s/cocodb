@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"cocodb"
+	"github.com/mrzack99s/cocodb"
 )
 
 // PubSubEvent represents an event recorded in the studio live stream.

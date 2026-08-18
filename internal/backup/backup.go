@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 
-	"cocodb/internal/file"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Backup creates a point-in-time backup snapshot file at dstPath.

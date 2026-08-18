@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"testing"
 
-	"cocodb/document"
-	"cocodb/internal/file"
-	"cocodb/internal/query/executor"
-	"cocodb/internal/record"
-	"cocodb/internal/storage"
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
-	"cocodb/internal/wal"
+	"github.com/mrzack99s/cocodb/document"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/query/executor"
+	"github.com/mrzack99s/cocodb/internal/record"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/wal"
 )
 
 func TestQueryEngineAndFiltering(t *testing.T) {

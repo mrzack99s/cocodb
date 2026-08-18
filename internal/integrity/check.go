@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/catalog"
-	"cocodb/internal/record"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/catalog"
+	"github.com/mrzack99s/cocodb/internal/record"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Report contains results of a database integrity verification.

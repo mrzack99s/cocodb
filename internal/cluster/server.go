@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cocodb"
-	"cocodb/queue"
+	"github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/queue"
 )
 
 // ServerConfig configures a cluster node server.

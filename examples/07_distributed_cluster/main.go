@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	coco "cocodb"
-	"cocodb/cluster"
+	coco "github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/cluster"
 )
 
 func main() {

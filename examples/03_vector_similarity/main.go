@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"cocodb/internal/vector"
+	"github.com/mrzack99s/cocodb/internal/vector"
 )
 
 func main() {

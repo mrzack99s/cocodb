@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"cocodb/internal/file"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Pager defines the core page storage interface.

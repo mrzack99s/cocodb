@@ -6,9 +6,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
-	"cocodb/internal/wal"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/wal"
 )
 
 var (

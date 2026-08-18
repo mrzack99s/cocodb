@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"cocodb/internal/file"
-	internalQueue "cocodb/internal/queue"
-	"cocodb/internal/storage"
-	"cocodb/queue"
+	"github.com/mrzack99s/cocodb/internal/file"
+	internalQueue "github.com/mrzack99s/cocodb/internal/queue"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/queue"
 )
 
 func createTestQueue(t *testing.T, name string) *queue.Queue {

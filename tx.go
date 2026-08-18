@@ -3,11 +3,11 @@ package cocodb
 import (
 	"fmt"
 
-	"cocodb/document"
-	"cocodb/internal/catalog"
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
-	"cocodb/kv"
+	"github.com/mrzack99s/cocodb/document"
+	"github.com/mrzack99s/cocodb/internal/catalog"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/kv"
 )
 
 // Tx represents a user-facing transactional boundary.

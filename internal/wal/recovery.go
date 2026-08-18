@@ -1,8 +1,8 @@
 package wal
 
 import (
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // RecoveryResult stores statistics from a crash recovery run.

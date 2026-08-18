@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Catalog manages system metadata (Buckets, Collections, Indexes).

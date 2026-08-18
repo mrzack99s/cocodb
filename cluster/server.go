@@ -1,8 +1,8 @@
 package cluster
 
 import (
-	"cocodb"
-	internalCluster "cocodb/internal/cluster"
+	"github.com/mrzack99s/cocodb"
+	internalCluster "github.com/mrzack99s/cocodb/internal/cluster"
 )
 
 // Node represents a running CoCoDB cluster server node.

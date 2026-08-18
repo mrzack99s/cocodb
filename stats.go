@@ -1,6 +1,6 @@
 package cocodb
 
-import "cocodb/internal/types"
+import "github.com/mrzack99s/cocodb/internal/types"
 
 // Stats provides telemetry and operational metrics for CoCo DB.
 type Stats struct {

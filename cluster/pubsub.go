@@ -3,8 +3,8 @@ package cluster
 import (
 	"context"
 
-	internalCluster "cocodb/internal/cluster"
-	"cocodb/pubsub"
+	internalCluster "github.com/mrzack99s/cocodb/internal/cluster"
+	"github.com/mrzack99s/cocodb/pubsub"
 )
 
 // PubSub provides distributed event broadcasting across cluster nodes.

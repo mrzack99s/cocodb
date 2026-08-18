@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 const (

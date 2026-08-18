@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cocodb/internal/file"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 func TestMemoryBackend(t *testing.T) {

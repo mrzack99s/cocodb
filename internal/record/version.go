@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"sync/atomic"
 
-	"cocodb/internal/storage"
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 const (

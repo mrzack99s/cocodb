@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // BTree represents a paged, disk-backed B+Tree.

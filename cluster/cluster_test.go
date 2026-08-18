@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	coco "cocodb"
-	"cocodb/cluster"
+	coco "github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/cluster"
 )
 
 // In-memory pipe network router for sandbox-safe unit testing

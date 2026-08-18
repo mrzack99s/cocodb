@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Key type tags for order-preserving serialization

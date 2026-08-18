@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	coco "cocodb"
+	coco "github.com/mrzack99s/cocodb"
 )
 
 func main() {

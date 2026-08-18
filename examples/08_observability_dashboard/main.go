@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	coco "cocodb"
-	"cocodb/dashboard"
+	coco "github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/dashboard"
 )
 
 func main() {

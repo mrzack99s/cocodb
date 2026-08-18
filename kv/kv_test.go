@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/file"
-	"cocodb/internal/index"
-	"cocodb/internal/storage"
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
-	"cocodb/internal/wal"
-	"cocodb/kv"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/index"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/wal"
+	"github.com/mrzack99s/cocodb/kv"
 )
 
 func TestBucketKVOperations(t *testing.T) {

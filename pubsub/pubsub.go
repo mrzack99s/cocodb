@@ -3,8 +3,8 @@ package pubsub
 import (
 	"context"
 
-	internalPubSub "cocodb/internal/pubsub"
-	internalQueue "cocodb/internal/queue"
+	internalPubSub "github.com/mrzack99s/cocodb/internal/pubsub"
+	internalQueue "github.com/mrzack99s/cocodb/internal/queue"
 )
 
 type Message = internalPubSub.Message

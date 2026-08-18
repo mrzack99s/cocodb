@@ -3,9 +3,9 @@ package index
 import (
 	"encoding/binary"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // PrimaryIndex maps document _id strings to RecordIDs using a B+Tree.

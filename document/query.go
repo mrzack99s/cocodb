@@ -3,10 +3,10 @@ package document
 import (
 	"fmt"
 
-	"cocodb/internal/index"
-	"cocodb/internal/query"
-	"cocodb/internal/query/executor"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/index"
+	"github.com/mrzack99s/cocodb/internal/query"
+	"github.com/mrzack99s/cocodb/internal/query/executor"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 type SortOrder uint8

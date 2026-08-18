@@ -1,7 +1,7 @@
 package vector
 
 import (
-	internalVec "cocodb/internal/vector"
+	internalVec "github.com/mrzack99s/cocodb/internal/vector"
 )
 
 type Metric = internalVec.Metric

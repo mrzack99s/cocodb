@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cocodb"
-	"cocodb/studio"
+	"github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/studio"
 )
 
 func setupTestDB(t *testing.T) *cocodb.DB {

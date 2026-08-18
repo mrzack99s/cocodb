@@ -3,8 +3,8 @@ package btree
 import (
 	"bytes"
 
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Cursor provides bidirectional range scanning over a B+Tree.

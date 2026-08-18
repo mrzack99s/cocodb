@@ -3,7 +3,7 @@ package storage
 import (
 	"sync"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Allocator manages page allocation and reuse using the free list and NextPageID.

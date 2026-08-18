@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	coco "cocodb"
-	"cocodb/studio"
+	coco "github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/studio"
 )
 
 func main() {

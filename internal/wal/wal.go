@@ -5,8 +5,8 @@ import (
 	"io"
 	"sync"
 
-	"cocodb/internal/file"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // WAL manages write-ahead logging to guarantee ACID durability and crash safety.

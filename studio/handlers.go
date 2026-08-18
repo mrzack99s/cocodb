@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"cocodb"
-	"cocodb/document"
-	"cocodb/internal/vector"
-	"cocodb/kv"
-	"cocodb/pubsub"
-	"cocodb/queue"
-	"cocodb/search"
+	"github.com/mrzack99s/cocodb"
+	"github.com/mrzack99s/cocodb/document"
+	"github.com/mrzack99s/cocodb/internal/vector"
+	"github.com/mrzack99s/cocodb/kv"
+	"github.com/mrzack99s/cocodb/pubsub"
+	"github.com/mrzack99s/cocodb/queue"
+	"github.com/mrzack99s/cocodb/search"
 )
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {

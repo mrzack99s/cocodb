@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	coco "cocodb"
+	coco "github.com/mrzack99s/cocodb"
 )
 
 func TestCoCoEndToEnd(t *testing.T) {

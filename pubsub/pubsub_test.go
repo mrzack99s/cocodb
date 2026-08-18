@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"cocodb/pubsub"
+	"github.com/mrzack99s/cocodb/pubsub"
 )
 
 func TestPubSub_Broadcast(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	internalQueue "cocodb/internal/queue"
+	internalQueue "github.com/mrzack99s/cocodb/internal/queue"
 )
 
 // Re-export common types and errors for developer convenience.

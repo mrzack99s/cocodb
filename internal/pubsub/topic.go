@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cocodb/internal/queue"
+	"github.com/mrzack99s/cocodb/internal/queue"
 )
 
 // BackpressureStrategy defines behavior when subscriber channel is full.

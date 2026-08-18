@@ -3,13 +3,13 @@ package cocodb
 import (
 	"time"
 
-	"cocodb/document"
-	"cocodb/internal/index"
-	"cocodb/internal/query"
-	"cocodb/internal/vector"
-	"cocodb/kv"
-	"cocodb/pubsub"
-	"cocodb/queue"
+	"github.com/mrzack99s/cocodb/document"
+	"github.com/mrzack99s/cocodb/internal/index"
+	"github.com/mrzack99s/cocodb/internal/query"
+	"github.com/mrzack99s/cocodb/internal/vector"
+	"github.com/mrzack99s/cocodb/kv"
+	"github.com/mrzack99s/cocodb/pubsub"
+	"github.com/mrzack99s/cocodb/queue"
 )
 
 // Document type alias for public API convenience.

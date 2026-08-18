@@ -3,7 +3,7 @@ package kv
 import (
 	"bytes"
 
-	"cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/btree"
 )
 
 // Iterator provides iteration over Key/Value pairs in a Bucket.

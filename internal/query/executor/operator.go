@@ -4,12 +4,12 @@ import (
 	"encoding/binary"
 	"sort"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/cson"
-	"cocodb/internal/query"
-	"cocodb/internal/record"
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/cson"
+	"github.com/mrzack99s/cocodb/internal/query"
+	"github.com/mrzack99s/cocodb/internal/record"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // Operator defines the Volcano execution iterator model.

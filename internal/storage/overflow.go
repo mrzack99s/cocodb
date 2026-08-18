@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 const (

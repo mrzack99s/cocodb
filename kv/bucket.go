@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/index"
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/index"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 var (

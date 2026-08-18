@@ -3,7 +3,7 @@ package storage
 import (
 	"sync"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // CacheShard is an isolated, locked LRU cache partition.

@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 type ObjectType uint8

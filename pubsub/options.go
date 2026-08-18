@@ -3,7 +3,7 @@ package pubsub
 import (
 	"time"
 
-	internalPubSub "cocodb/internal/pubsub"
+	internalPubSub "github.com/mrzack99s/cocodb/internal/pubsub"
 )
 
 type BackpressureStrategy = internalPubSub.BackpressureStrategy

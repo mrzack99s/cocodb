@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cocodb/internal/btree"
-	"cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/btree"
+	"github.com/mrzack99s/cocodb/internal/storage"
 )
 
 // Options for configuring an internal Queue instance.

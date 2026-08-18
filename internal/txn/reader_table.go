@@ -3,7 +3,7 @@ package txn
 import (
 	"sync"
 
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // ReaderTable tracks all currently active read snapshots.

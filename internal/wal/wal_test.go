@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"cocodb/internal/file"
-	"cocodb/internal/storage"
-	"cocodb/internal/wal"
+	"github.com/mrzack99s/cocodb/internal/file"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/wal"
 )
 
 func TestWALAppendAndRecovery(t *testing.T) {

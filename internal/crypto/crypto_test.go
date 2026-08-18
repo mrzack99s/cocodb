@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"cocodb/internal/crypto"
+	"github.com/mrzack99s/cocodb/internal/crypto"
 )
 
 func TestAES256GCMEncryption(t *testing.T) {

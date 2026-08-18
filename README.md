@@ -45,7 +45,7 @@ package main
 import (
 	"log"
 
-	coco "cocodb"
+	coco "github.com/mrzack99s/cocodb"
 )
 
 func main() {

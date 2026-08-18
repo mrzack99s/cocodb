@@ -3,8 +3,8 @@ package record
 import (
 	"io"
 
-	"cocodb/internal/txn"
-	"cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/txn"
+	"github.com/mrzack99s/cocodb/internal/types"
 )
 
 // BlobWriter streams large binary objects into the store.

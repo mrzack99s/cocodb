@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"cocodb/internal/index"
-	"cocodb/internal/storage"
-	"cocodb/internal/types"
-	"cocodb/internal/wal"
+	"github.com/mrzack99s/cocodb/internal/index"
+	"github.com/mrzack99s/cocodb/internal/storage"
+	"github.com/mrzack99s/cocodb/internal/types"
+	"github.com/mrzack99s/cocodb/internal/wal"
 )
 
 // Scheduler manages periodic maintenance tasks (checkpoint, TTL cleanup, vacuum).
