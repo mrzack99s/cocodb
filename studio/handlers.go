@@ -541,6 +541,14 @@ func (s *Server) handleTextSearch(w http.ResponseWriter, r *http.Request) {
 	if req.K <= 0 {
 		req.K = 10
 	}
+	if strings.TrimSpace(req.Collection) == "" {
+		s.writeError(w, http.StatusBadRequest, "Collection is required")
+		return
+	}
+	if strings.TrimSpace(req.Query) == "" {
+		s.writeError(w, http.StatusBadRequest, "Search query is required")
+		return
+	}
 
 	coll := s.db.Collection(req.Collection)
 	docs, err := coll.Query().All()
@@ -555,8 +563,26 @@ func (s *Server) handleTextSearch(w http.ResponseWriter, r *http.Request) {
 	for i, doc := range docs {
 		recID := uint64(i + 1)
 		docMap[recID] = doc
-		if txtVal, ok := doc[req.Field]; ok {
-			idx.IndexDoc(recID, fmt.Sprintf("%v", txtVal))
+		if req.Field != "" {
+			if txtVal, ok := doc[req.Field]; ok {
+				idx.IndexDoc(recID, fmt.Sprintf("%v", txtVal))
+			}
+			continue
+		}
+
+		// With no field selected, search every top-level string field. This is
+		// the useful default for an explorer because document schemas vary.
+		var text strings.Builder
+		for _, value := range doc {
+			if value, ok := value.(string); ok {
+				if text.Len() > 0 {
+					text.WriteByte(' ')
+				}
+				text.WriteString(value)
+			}
+		}
+		if text.Len() > 0 {
+			idx.IndexDoc(recID, text.String())
 		}
 	}
 

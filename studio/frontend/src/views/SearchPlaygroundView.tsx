@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Search,
   Sparkles,
@@ -16,14 +16,22 @@ export const SearchPlaygroundView: React.FC<SearchPlaygroundViewProps> = ({
   catalog,
 }) => {
   const collections = catalog?.collections || []
-  const [collection, setCollection] = useState(collections[0]?.name || '')
-  const [field, setField] = useState('title')
+  const [collection, setCollection] = useState('')
+  const [field, setField] = useState('')
   const [queryText, setQueryText] = useState('')
   const [k, setK] = useState(10)
 
   const [results, setResults] = useState<TextSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // The catalog arrives after this view mounts. Keep the selected collection
+  // in sync so the first search uses the collection displayed in the select.
+  useEffect(() => {
+    if (!collections.some((item) => item.name === collection)) {
+      setCollection(collections[0]?.name || '')
+    }
+  }, [collection, collections])
 
   const handleSearch = async () => {
     if (!collection) {
@@ -92,12 +100,12 @@ export const SearchPlaygroundView: React.FC<SearchPlaygroundViewProps> = ({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-600 dark:text-zinc-400 block mb-1">Indexed Field</label>
+            <label className="text-xs text-zinc-600 dark:text-zinc-400 block mb-1">Field <span className="text-zinc-400">(optional)</span></label>
             <input
               type="text"
               value={field}
               onChange={(e) => setField(e.target.value)}
-              placeholder="e.g. content, description, title"
+              placeholder="All text fields (or e.g. content)"
               className="w-full bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-xs text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-sky-500/50"
             />
           </div>

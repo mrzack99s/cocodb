@@ -145,6 +145,36 @@ func TestStudioAPIEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("POST /api/text/search status = %d", rec.Code)
 	}
+	var textRes struct {
+		Results []struct {
+			DocID string `json:"doc_id"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&textRes); err != nil {
+		t.Fatalf("Decode text search response failed: %v", err)
+	}
+	if len(textRes.Results) != 1 || textRes.Results[0].DocID != "u1" {
+		t.Fatalf("text search returned %#v, want matching document u1", textRes.Results)
+	}
+
+	// An omitted field searches the document's text fields, which is the UI default.
+	textBody, _ = json.Marshal(map[string]any{
+		"collection": "users",
+		"query":      "john",
+		"k":          5,
+	})
+	req = httptest.NewRequest("POST", "/api/text/search", bytes.NewReader(textBody))
+	rec = httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /api/text/search without field status = %d", rec.Code)
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&textRes); err != nil {
+		t.Fatalf("Decode all-fields text search response failed: %v", err)
+	}
+	if len(textRes.Results) != 1 || textRes.Results[0].DocID != "u1" {
+		t.Fatalf("all-fields text search returned %#v, want matching document u1", textRes.Results)
+	}
 
 	// 9. Integrity Check
 	req = httptest.NewRequest("GET", "/api/integrity/check", nil)
