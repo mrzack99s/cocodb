@@ -541,6 +541,7 @@ func (s *Server) handleTextSearch(w http.ResponseWriter, r *http.Request) {
 	if req.K <= 0 {
 		req.K = 10
 	}
+	req.Field = strings.TrimSpace(req.Field)
 	if strings.TrimSpace(req.Collection) == "" {
 		s.writeError(w, http.StatusBadRequest, "Collection is required")
 		return
