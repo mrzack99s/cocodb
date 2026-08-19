@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/mrzack99s/cocodb/internal/btree"
@@ -120,5 +121,8 @@ func (c *Catalog) ListObjects(objType ObjectType) []*Object {
 			result = append(result, obj)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 	return result
 }

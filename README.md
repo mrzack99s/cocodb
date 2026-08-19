@@ -100,7 +100,7 @@ results, err := users.Query().
 Common options can be passed when opening a database:
 
 ```go
-db, err := coco.Open("app.coco",
+	db, err := coco.Open("app.coco",
 	coco.Profile(coco.Balanced),
 	coco.SyncMode(coco.SyncNormal),
 	coco.MemoryLimit(128*1024*1024),
@@ -109,6 +109,73 @@ db, err := coco.Open("app.coco",
 ```
 
 Profiles provide convenient defaults, while individual options allow applications to tune durability, memory use, encryption, background maintenance, and read-only access.
+
+The storage used by Key/Value buckets (and all other models in the database)
+is configurable. `StorageAuto` is the default: it uses RAM for `:memory:` and
+disk for a file path. Use `StorageMemory` to force RAM, `StorageDisk` to force
+a path-backed database, or `CustomStorage` to provide an implementation such
+as encrypted or remote storage:
+
+```go
+db, err := coco.Open("cache.coco",
+	coco.Storage(coco.StorageMemory),
+	coco.CustomProfile(coco.ProfileConfig{
+		MemoryLimit:   256 * 1024 * 1024,
+		SyncMode:      coco.SyncOff,
+		Background:    true,
+		CleanInterval: time.Second,
+	}),
+)
+```
+
+`CustomProfile` lets applications define their own memory, durability, and
+maintenance defaults; explicit options passed after it override those values.
+
+### Per-model storage
+
+Use `DefaultDisk()` or `DefaultMemory()` when every model should use one
+storage kind. Override individual models when their data has a different
+durability requirement:
+
+```go
+db, err := coco.Open("app.coco",
+	coco.DefaultDisk(),
+	coco.KVStorage(coco.StorageMemory),
+	coco.DocumentStorage(coco.StorageDisk),
+	coco.QueueStorage(coco.StorageDisk),
+)
+```
+
+An overridden disk model uses its own sibling database file (for example,
+`app.coco-kv`); memory-backed models are deliberately not retained after
+`Close`. `KVCustomStorage`, `DocumentCustomStorage`, and `QueueCustomStorage`
+accept a `BackendFactory` for other storage implementations. Because these are
+separate engines, an `Update` spanning more than one configured model commits
+each engine independently rather than as one cross-store ACID commit.
+
+### Multiple writer processes
+
+For more than one process writing the same database path, opt in to an
+isolated write session per `Update`:
+
+```go
+db, err := coco.Open("app.coco",
+	coco.DefaultDisk(),
+	coco.MultiWriter(),
+	coco.WriterTimeout(30*time.Second),
+)
+```
+
+`MultiWriter` serializes writers by opening a fresh, exclusively locked engine
+for each update, so a process commits against the latest recovered WAL state.
+Use `Update` for every write; direct mutable collection/bucket handles are not
+safe to share between processes. Background maintenance is disabled in this
+mode because it would retain stale page state.
+
+One open database instance supports many simultaneous read transactions and
+serializes concurrent write transactions to preserve ACID guarantees. Opening
+the same disk path with `MultiWriter` is supported; without it, a second writer
+remains deliberately blocked.
 
 ## Examples
 

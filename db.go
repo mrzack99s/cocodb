@@ -2,8 +2,11 @@ package cocodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
 	"sync"
+	"time"
 
 	"github.com/mrzack99s/cocodb/document"
 	"github.com/mrzack99s/cocodb/internal/backup"
@@ -27,22 +30,23 @@ import (
 
 // DB represents a CoCo multi-model embedded database instance.
 type DB struct {
-	mu        sync.RWMutex
-	path      string
-	backend   file.Backend
-	lock      *file.FileLock
-	pager     storage.Pager
-	wal       *wal.WAL
-	tm        *txn.TxnManager
-	catalog   *catalog.Catalog
-	dir       *record.Directory
-	store     *record.Store
-	ttlIndex  *index.TTLIndex
-	scheduler *maintenance.Scheduler
-	trees     map[types.PageID]*btree.BTree
-	colDicts  map[string]*cson.FieldDictionary
+	mu              sync.RWMutex
+	path            string
+	backend         file.Backend
+	lock            *file.FileLock
+	pager           storage.Pager
+	wal             *wal.WAL
+	tm              *txn.TxnManager
+	catalog         *catalog.Catalog
+	dir             *record.Directory
+	store           *record.Store
+	ttlIndex        *index.TTLIndex
+	scheduler       *maintenance.Scheduler
+	trees           map[types.PageID]*btree.BTree
+	colDicts        map[string]*cson.FieldDictionary
 	queues          map[string]*queue.Queue
 	pubsub          *pubsub.PubSub
+	modelDBs        map[Model]*DB
 	clusterStatusFn func() any
 	opts            Options
 	closed          bool
@@ -54,13 +58,15 @@ func Open(path string, opts ...Option) (*DB, error) {
 	for _, o := range opts {
 		o(&cfg)
 	}
+	if cfg.MultiWriter {
+		cfg.Background = false
+	}
 
 	var backend file.Backend
 	var lock *file.FileLock
 
-	if path == ":memory:" || path == "" {
-		backend = file.NewMemoryBackend()
-	} else {
+	usesDisk := cfg.BackendFactory == nil && (cfg.Storage == StorageDisk || (cfg.Storage == StorageAuto && path != ":memory:" && path != ""))
+	if usesDisk {
 		var err error
 		if !cfg.ReadOnly {
 			lock, err = file.AcquireLock(path)
@@ -68,13 +74,13 @@ func Open(path string, opts ...Option) (*DB, error) {
 				return nil, err
 			}
 		}
-		backend, err = file.OpenOSBackend(path, cfg.ReadOnly)
-		if err != nil {
-			if lock != nil {
-				_ = lock.Release()
-			}
-			return nil, err
+	}
+	backend, err := openBackend(cfg, path, false)
+	if err != nil {
+		if lock != nil {
+			_ = lock.Release()
 		}
+		return nil, err
 	}
 
 	pager, err := storage.OpenPager(backend, cfg.MemoryLimit, cfg.ReadOnly)
@@ -87,19 +93,17 @@ func Open(path string, opts ...Option) (*DB, error) {
 	}
 
 	// Open or create WAL
-	var walBackend file.Backend
-	if path == ":memory:" || path == "" {
-		walBackend = file.NewMemoryBackend()
-	} else {
-		walPath := path + "-wal"
-		walBackend, err = file.OpenOSBackend(walPath, cfg.ReadOnly)
-		if err != nil {
-			_ = pager.Close()
-			if lock != nil {
-				_ = lock.Release()
-			}
-			return nil, err
+	walPath := path
+	if usesDisk || cfg.BackendFactory != nil {
+		walPath += "-wal"
+	}
+	walBackend, err := openBackend(cfg, walPath, true)
+	if err != nil {
+		_ = pager.Close()
+		if lock != nil {
+			_ = lock.Release()
 		}
+		return nil, err
 	}
 
 	walManager, err := wal.OpenWAL(walBackend, pager.Meta().LastLSN)
@@ -166,6 +170,7 @@ func Open(path string, opts ...Option) (*DB, error) {
 		colDicts: make(map[string]*cson.FieldDictionary),
 		queues:   make(map[string]*queue.Queue),
 		pubsub:   pubsub.New(256),
+		modelDBs: make(map[Model]*DB),
 		opts:     cfg,
 	}
 
@@ -183,7 +188,73 @@ func Open(path string, opts ...Option) (*DB, error) {
 		db.scheduler.Start()
 	}
 
+	// A model override owns an independent database engine. This intentionally
+	// keeps volatile KV data out of the durable document file (and vice versa).
+	for model, storageCfg := range cfg.ModelStorage {
+		if storageCfg.Kind == cfg.Storage && storageCfg.Factory == nil {
+			continue
+		}
+		modelPath := path + "-" + string(model)
+		childOpts := []Option{
+			MemoryLimit(cfg.MemoryLimit),
+			SyncMode(cfg.SyncMode),
+			Background(cfg.Background),
+			Storage(storageCfg.Kind),
+		}
+		if cfg.ReadOnly {
+			childOpts = append(childOpts, ReadOnly())
+		}
+		if storageCfg.Factory != nil {
+			childOpts = append(childOpts, CustomStorage(storageCfg.Factory))
+		}
+		if cfg.MultiWriter {
+			childOpts = append(childOpts, MultiWriter(), WriterTimeout(cfg.WriterTimeout))
+		}
+		child, err := Open(modelPath, childOpts...)
+		if err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("open %s storage: %w", model, err)
+		}
+		db.modelDBs[model] = child
+	}
+	if cfg.MultiWriter && db.lock != nil {
+		// The lock is reacquired for each isolated write transaction instead
+		// of being held for the lifetime of this process.
+		_ = db.lock.Release()
+		db.lock = nil
+	}
+
 	return db, nil
+}
+
+func (db *DB) isolatedWriter(fn func(tx *Tx) error) error {
+	deadline := time.Now().Add(db.opts.WriterTimeout)
+	for {
+		cfg := db.opts
+		cfg.MultiWriter = false
+		cfg.Background = false
+		cfg.ModelStorage = maps.Clone(db.opts.ModelStorage)
+		writer, err := Open(db.path, func(o *Options) { *o = cfg })
+		if err == nil {
+			err = writer.Update(fn)
+			closeErr := writer.Close()
+			if err != nil {
+				return err
+			}
+			return closeErr
+		}
+		if !errors.Is(err, file.ErrDatabaseLocked) || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func (db *DB) modelDB(model Model) *DB {
+	if child := db.modelDBs[model]; child != nil {
+		return child
+	}
+	return db
 }
 
 func (db *DB) getOrOpenTree(root types.PageID) *btree.BTree {
@@ -242,6 +313,9 @@ func (db *DB) Update(fn func(tx *Tx) error) error {
 	if db.opts.ReadOnly {
 		return ErrReadOnly
 	}
+	if db.opts.MultiWriter {
+		return db.isolatedWriter(fn)
+	}
 	tx, err := db.Begin(false)
 	if err != nil {
 		return err
@@ -279,12 +353,16 @@ func (db *DB) Begin(readOnly bool) (*Tx, error) {
 	tx.internalTx = internalTx
 	tx.buckets = nil
 	tx.collections = nil
+	tx.childTxs = nil
 
 	return tx, nil
 }
 
 // Bucket returns a Bucket helper for quick point operations.
 func (db *DB) Bucket(name string) *kv.Bucket {
+	if target := db.modelDB(ModelKV); target != db {
+		return target.Bucket(name)
+	}
 	obj, ok := db.catalog.GetObject(catalog.ObjectBucket, name)
 	var root types.PageID = types.InvalidPageID
 	var objID types.ObjectID = types.InvalidObjectID
@@ -307,6 +385,9 @@ func (db *DB) Bucket(name string) *kv.Bucket {
 
 // Collection returns a Collection helper for document operations.
 func (db *DB) Collection(name string) *document.Collection {
+	if target := db.modelDB(ModelDocument); target != db {
+		return target.Collection(name)
+	}
 	obj, ok := db.catalog.GetObject(catalog.ObjectCollection, name)
 	var root types.PageID = types.InvalidPageID
 	var objID types.ObjectID = types.InvalidObjectID
@@ -331,6 +412,9 @@ func (db *DB) Collection(name string) *document.Collection {
 
 // ListBuckets returns the names of all Key/Value buckets in the database.
 func (db *DB) ListBuckets() []string {
+	if target := db.modelDB(ModelKV); target != db {
+		return target.ListBuckets()
+	}
 	objs := db.catalog.ListObjects(catalog.ObjectBucket)
 	res := make([]string, len(objs))
 	for i, o := range objs {
@@ -341,6 +425,9 @@ func (db *DB) ListBuckets() []string {
 
 // ListCollections returns the names of all Document collections in the database.
 func (db *DB) ListCollections() []string {
+	if target := db.modelDB(ModelDocument); target != db {
+		return target.ListCollections()
+	}
 	objs := db.catalog.ListObjects(catalog.ObjectCollection)
 	res := make([]string, len(objs))
 	for i, o := range objs {
@@ -351,6 +438,9 @@ func (db *DB) ListCollections() []string {
 
 // Queue returns or opens a transactional task queue handle.
 func (db *DB) Queue(name string, opts ...queue.Option) *queue.Queue {
+	if target := db.modelDB(ModelQueue); target != db {
+		return target.Queue(name, opts...)
+	}
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -409,6 +499,9 @@ func (db *DB) Subscribe(ctx context.Context, topicPattern string, opts ...pubsub
 
 // ListQueues returns the names of all persistent Queues registered in the catalog.
 func (db *DB) ListQueues() []string {
+	if target := db.modelDB(ModelQueue); target != db {
+		return target.ListQueues()
+	}
 	objs := db.catalog.ListObjects(catalog.ObjectQueue)
 	res := make([]string, len(objs))
 	for i, o := range objs {
@@ -455,6 +548,11 @@ func (db *DB) Close() error {
 	if db.scheduler != nil {
 		db.scheduler.Stop()
 	}
+	for _, child := range db.modelDBs {
+		if err := child.Close(); err != nil {
+			return err
+		}
+	}
 
 	// Close and stop background workers of all active queues
 	for _, q := range db.queues {
@@ -467,6 +565,16 @@ func (db *DB) Close() error {
 			obj.ExtraData = dict.Encode()
 			_ = db.catalog.PutObject(obj)
 		}
+	}
+
+	if db.opts.MultiWriter {
+		for _, child := range db.modelDBs {
+			_ = child.Close()
+		}
+		// This handle is read-mostly and may have stale metadata. Do not let
+		// Pager.Close checkpoint it over a newer multi-process commit.
+		_ = db.wal.Close()
+		return db.backend.Close()
 	}
 
 	var errs []error

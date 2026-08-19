@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Layers,
   Plus,
@@ -37,21 +37,26 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [jsonInput, setJsonInput] = useState('')
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const latestRequest = useRef(0)
 
   useEffect(() => {
-    if (collections.length > 0 && !selectedCollection) {
-      setSelectedCollection(collections[0].name)
-    }
-  }, [collections, selectedCollection])
+    setSelectedCollection((current) => {
+      if (current && collections.some((collection) => collection.name === current)) {
+        return current
+      }
+      return collections[0]?.name ?? ''
+    })
+  }, [catalog])
 
   useEffect(() => {
     if (selectedCollection) {
-      loadDocuments()
+      void loadDocuments(selectedCollection)
     }
   }, [selectedCollection])
 
-  const loadDocuments = async () => {
-    if (!selectedCollection) return
+  const loadDocuments = async (collection = selectedCollection) => {
+    if (!collection) return
+    const requestID = ++latestRequest.current
     setLoading(true)
     setError(null)
     try {
@@ -64,15 +69,23 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
         filters.push({ field: filterField.trim(), op: filterOp, value: val })
       }
 
-      const res = await api.queryDocuments(selectedCollection, {
+      const res = await api.queryDocuments(collection, {
         filters: filters.length > 0 ? filters : undefined,
         limit: 50,
       })
-      setDocuments(res.documents || [])
+      // Catalog refreshes and tab changes can overlap with a slow query. Only
+      // the latest request is allowed to update the visible collection.
+      if (requestID === latestRequest.current) {
+        setDocuments(res.documents || [])
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to load documents')
+      if (requestID === latestRequest.current) {
+        setError(err.message || 'Failed to load documents')
+      }
     } finally {
-      setLoading(false)
+      if (requestID === latestRequest.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -206,7 +219,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
         />
 
         <button
-          onClick={loadDocuments}
+          onClick={() => void loadDocuments()}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-medium transition cursor-pointer"
         >
           <Search className="w-3.5 h-3.5" />

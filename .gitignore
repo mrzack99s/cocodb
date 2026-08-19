@@ -8,6 +8,10 @@ coverage.txt
 # Frontend dependencies and build output
 **/node_modules/
 **/dist/
+!studio/frontend/dist/
+!studio/frontend/dist/**
+!dashboard/frontend/dist/
+!dashboard/frontend/dist/**
 **/.vite/
 
 # Environment files and local logs

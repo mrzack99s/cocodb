@@ -16,6 +16,25 @@ type Tx struct {
 	internalTx  *txn.Transaction
 	buckets     map[string]*kv.Bucket
 	collections map[string]*document.Collection
+	childTxs    map[*DB]*Tx
+}
+
+func (tx *Tx) childTx(target *DB) (*Tx, error) {
+	if target == tx.db {
+		return tx, nil
+	}
+	if child, ok := tx.childTxs[target]; ok {
+		return child, nil
+	}
+	child, err := target.Begin(tx.ReadOnly())
+	if err != nil {
+		return nil, err
+	}
+	if tx.childTxs == nil {
+		tx.childTxs = make(map[*DB]*Tx)
+	}
+	tx.childTxs[target] = child
+	return child, nil
 }
 
 func (tx *Tx) ID() types.TxnID {
@@ -28,6 +47,13 @@ func (tx *Tx) ReadOnly() bool {
 
 // Bucket returns a transactional Bucket handle.
 func (tx *Tx) Bucket(name string) *kv.Bucket {
+	if target := tx.db.modelDB(ModelKV); target != tx.db {
+		child, err := tx.childTx(target)
+		if err != nil {
+			return nil
+		}
+		return child.Bucket(name)
+	}
 	if tx.buckets == nil {
 		tx.buckets = make(map[string]*kv.Bucket)
 	} else if b, ok := tx.buckets[name]; ok {
@@ -61,6 +87,13 @@ func (tx *Tx) Bucket(name string) *kv.Bucket {
 
 // Collection returns a transactional Collection handle.
 func (tx *Tx) Collection(name string) *document.Collection {
+	if target := tx.db.modelDB(ModelDocument); target != tx.db {
+		child, err := tx.childTx(target)
+		if err != nil {
+			return nil
+		}
+		return child.Collection(name)
+	}
 	if tx.collections == nil {
 		tx.collections = make(map[string]*document.Collection)
 	} else if c, ok := tx.collections[name]; ok {
@@ -126,11 +159,20 @@ func (tx *Tx) Commit() error {
 	}
 
 	err := tx.internalTx.Commit()
+	if err == nil {
+		for _, child := range tx.childTxs {
+			if childErr := child.Commit(); childErr != nil {
+				err = childErr
+				break
+			}
+		}
+	}
 
 	tx.db = nil
 	tx.internalTx = nil
 	tx.buckets = nil
 	tx.collections = nil
+	tx.childTxs = nil
 	txPool.Put(tx)
 
 	if err != nil {
@@ -145,11 +187,15 @@ func (tx *Tx) Rollback() error {
 		return nil
 	}
 	err := tx.internalTx.Rollback()
+	for _, child := range tx.childTxs {
+		_ = child.Rollback()
+	}
 
 	tx.db = nil
 	tx.internalTx = nil
 	tx.buckets = nil
 	tx.collections = nil
+	tx.childTxs = nil
 	txPool.Put(tx)
 
 	return err
