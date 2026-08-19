@@ -1,6 +1,6 @@
 # CoCoDB
 
-CoCoDB is a pure-Go embedded database that keeps application data in a single database file. It combines key/value storage, document collections, vector search, full-text search, queues, and pub/sub behind one transactional API.
+CoCoDB is a pure-Go embedded database that keeps application data in a single database file. It combines key/value storage, document collections, time-series data, vector search, full-text search, queues, and pub/sub behind one transactional API.
 
 [![Go](https://img.shields.io/badge/Go-1.26.5%2B-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue)](LICENSE)
@@ -10,6 +10,7 @@ CoCoDB is a pure-Go embedded database that keeps application data in a single da
 
 - ACID transactions with crash recovery
 - Key/value buckets and document collections
+- Time-series points for logs, metrics, and IoT telemetry
 - HNSW vector similarity and BM25 full-text search
 - Durable queues and in-process pub/sub
 - Optional Admin Studio and metrics dashboard
@@ -25,6 +26,7 @@ CoCoDB is intended for Go applications that need local, transactional storage wi
 | --- | --- |
 | Key/value | Store and scan byte keys and values, with optional TTL |
 | Documents | Work with structured records, indexes, and fluent queries |
+| Time series | Store timestamped points with tags and fields; range query, retention pruning, and rollups |
 | Vector search | Find similar vectors using HNSW indexes |
 | Full-text search | Rank text matches using BM25 |
 | Queues | Process durable background tasks with acknowledgements and retries |
@@ -94,6 +96,34 @@ results, err := users.Query().
 	Limit(20).
 	All()
 ```
+
+## Time-series logs and IoT telemetry
+
+Time-series data is stored durably in the same database and can participate in
+the same `Update` transaction as documents and key/value state. A point has a
+timestamp, low-cardinality identifying tags, and flexible fields:
+
+```go
+readings := db.TimeSeries("sensor-readings")
+_, err := readings.Write(coco.Point{
+	Timestamp: time.Now(),
+	Tags:      map[string]string{"device": "kitchen-1", "site": "home"},
+	Fields:    map[string]any{"temperature": 22.4, "humidity": 61},
+})
+
+points, err := readings.Query().
+	Range(time.Now().Add(-time.Hour), time.Now()).
+	Tag("device", "kitchen-1").
+	All()
+
+// Hourly average temperature. Other choices are coco.Count, coco.Sum,
+// coco.Minimum, and coco.Maximum.
+hourly, err := readings.Query().Aggregate("temperature", time.Hour, coco.Average)
+```
+
+Use `PruneBefore` to implement a retention policy. For atomic ingestion with
+other models, obtain the series from `tx.TimeSeries("sensor-readings")` inside
+`db.Update`.
 
 ## Configuration
 

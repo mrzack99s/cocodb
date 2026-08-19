@@ -228,3 +228,42 @@ func TestStudioAPIEndpoints(t *testing.T) {
 		t.Fatalf("GET /api/metrics response does not contain Prometheus metrics")
 	}
 }
+
+func TestStudioTimeSeriesEndpoints(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	srv := studio.NewServer(db, ":0")
+
+	writeBody, _ := json.Marshal(map[string]any{
+		"series": "iot-readings",
+		"point": map[string]any{
+			"timestamp": "2026-08-19T10:00:00Z",
+			"tags":      map[string]string{"device": "sensor-01"},
+			"fields":    map[string]any{"temperature": 22.4},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/timeseries/write", bytes.NewReader(writeBody))
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /api/timeseries/write status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/timeseries/list", nil)
+	rec = httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("iot-readings")) {
+		t.Fatalf("GET /api/timeseries/list = %d, %s", rec.Code, rec.Body.String())
+	}
+
+	queryBody, _ := json.Marshal(map[string]any{
+		"series": "iot-readings",
+		"tags":   map[string]string{"device": "sensor-01"},
+	})
+	req = httptest.NewRequest(http.MethodPost, "/api/timeseries/query", bytes.NewReader(queryBody))
+	rec = httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("temperature")) {
+		t.Fatalf("POST /api/timeseries/query = %d, %s", rec.Code, rec.Body.String())
+	}
+}

@@ -1,4 +1,4 @@
-import type { DBStats, CatalogData, KVEntry, QueryResult, VectorSearchResult, TextSearchResult, IntegrityReport } from './types'
+import type { DBStats, CatalogData, KVEntry, QueryResult, VectorSearchResult, TextSearchResult, IntegrityReport, TimeSeriesPoint } from './types'
 
 const BASE_URL = '/api'
 
@@ -31,6 +31,33 @@ export const api = {
 
   // Catalog
   getCatalog: () => request<CatalogData>('/catalog'),
+
+  // Time series
+  listTimeSeries: () => request<{ series: string[] }>('/timeseries/list'),
+
+  queryTimeSeries: (payload: {
+    series: string
+    start?: string
+    end?: string
+    tags?: Record<string, string>
+    limit?: number
+    descending?: boolean
+  }) => request<{ points: TimeSeriesPoint[]; count: number }>('/timeseries/query', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+
+  writeTimeSeries: (series: string, point: TimeSeriesPoint) =>
+    request<{ id: string }>('/timeseries/write', {
+      method: 'POST',
+      body: JSON.stringify({ series, point }),
+    }),
+
+  pruneTimeSeries: (series: string, before: string) =>
+    request<{ removed: number }>('/timeseries/prune', {
+      method: 'POST',
+      body: JSON.stringify({ series, before }),
+    }),
 
   // KV Buckets
   scanBucket: (bucket: string, prefix = '', limit = 100) =>

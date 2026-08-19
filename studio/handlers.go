@@ -28,6 +28,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Document endpoints
 	mux.HandleFunc("/api/doc/", s.handleDocRoute)
 
+	// Time-series endpoints
+	mux.HandleFunc("/api/timeseries/list", s.handleTimeSeriesList)
+	mux.HandleFunc("/api/timeseries/query", s.handleTimeSeriesQuery)
+	mux.HandleFunc("/api/timeseries/write", s.handleTimeSeriesWrite)
+	mux.HandleFunc("/api/timeseries/prune", s.handleTimeSeriesPrune)
+
 	// Search endpoints
 	mux.HandleFunc("/api/vector/search", s.handleVectorSearch)
 	mux.HandleFunc("/api/text/search", s.handleTextSearch)
@@ -131,9 +137,14 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 		buckets[i] = item{Name: b, Type: "Bucket"}
 	}
 
-	colls := make([]item, len(collNames))
-	for i, c := range collNames {
-		colls[i] = item{Name: c, Type: "Collection"}
+	// Time-series data has its own Studio explorer, so keep its internal
+	// backing collections out of the regular document browser.
+	colls := make([]item, 0, len(collNames))
+	for _, c := range collNames {
+		if strings.HasPrefix(c, "_ts:") {
+			continue
+		}
+		colls = append(colls, item{Name: c, Type: "Collection"})
 	}
 
 	queues := make([]item, len(queueNames))
@@ -736,8 +747,8 @@ func (s *Server) handleQueueEnqueue(w http.ResponseWriter, r *http.Request) {
 // POST /api/queue/dequeue
 func (s *Server) handleQueueDequeue(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Queue    string `json:"queue"`
-		AutoAck  bool   `json:"auto_ack"`
+		Queue   string `json:"queue"`
+		AutoAck bool   `json:"auto_ack"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeError(w, http.StatusBadRequest, "Invalid JSON body")
@@ -831,10 +842,10 @@ func (s *Server) handlePubSubPublish(w http.ResponseWriter, r *http.Request) {
 	s.historyMu.Unlock()
 
 	s.writeJSON(w, http.StatusOK, map[string]any{
-		"success":          true,
-		"topic":            req.Topic,
+		"success":         true,
+		"topic":           req.Topic,
 		"subscribers_hit": count,
-		"event_id":         event.ID,
+		"event_id":        event.ID,
 	})
 }
 

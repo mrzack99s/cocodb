@@ -11,6 +11,7 @@ import { QueryConsoleView } from './views/QueryConsoleView'
 import { VectorPlaygroundView } from './views/VectorPlaygroundView'
 import { SearchPlaygroundView } from './views/SearchPlaygroundView'
 import { MaintenanceView } from './views/MaintenanceView'
+import { TimeSeriesView } from './views/TimeSeriesView'
 import { api } from './api'
 import type { DBStats, CatalogData } from './types'
 
@@ -18,6 +19,7 @@ export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [stats, setStats] = useState<DBStats | null>(null)
   const [catalog, setCatalog] = useState<CatalogData | null>(null)
+  const [timeSeriesCount, setTimeSeriesCount] = useState(0)
   const [loading, setLoading] = useState(false)
 
   // Theme state: 'light' | 'dark'
@@ -44,12 +46,14 @@ export const App: React.FC = () => {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [statsRes, catalogRes] = await Promise.all([
+      const [statsRes, catalogRes, seriesRes] = await Promise.all([
         api.getStats().catch(() => null),
         api.getCatalog().catch(() => ({ buckets: [], collections: [], queues: [] })),
+        api.listTimeSeries().catch(() => ({ series: [] })),
       ])
       if (statsRes) setStats(statsRes)
       if (catalogRes) setCatalog(catalogRes)
+      setTimeSeriesCount(seriesRes.series.length)
     } finally {
       setLoading(false)
     }
@@ -69,6 +73,7 @@ export const App: React.FC = () => {
         onSelectView={setCurrentView}
         bucketCount={catalog?.buckets?.length || 0}
         collectionCount={catalog?.collections?.length || 0}
+        timeSeriesCount={timeSeriesCount}
         queueCount={catalog?.queues?.length || 0}
       />
 
@@ -97,6 +102,7 @@ export const App: React.FC = () => {
                 onRefreshCatalog={fetchData}
               />
             )}
+            {currentView === 'timeseries' && <TimeSeriesView onRefreshCatalog={fetchData} />}
             {currentView === 'buckets' && (
               <BucketsView
                 catalog={catalog}

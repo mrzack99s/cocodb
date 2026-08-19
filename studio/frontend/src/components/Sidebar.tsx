@@ -10,11 +10,13 @@ import {
   Zap,
   Package,
   Radio,
+  Activity,
 } from 'lucide-react'
 
 export type ViewType =
   | 'dashboard'
   | 'collections'
+  | 'timeseries'
   | 'buckets'
   | 'queues'
   | 'pubsub'
@@ -28,6 +30,7 @@ interface SidebarProps {
   onSelectView: (view: ViewType) => void
   bucketCount: number
   collectionCount: number
+  timeSeriesCount?: number
   queueCount?: number
 }
 
@@ -36,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectView,
   bucketCount,
   collectionCount,
+  timeSeriesCount = 0,
   queueCount = 0,
 }) => {
   const navItems: {
@@ -46,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'collections', label: 'Collections', icon: Layers, badge: collectionCount },
+    { id: 'timeseries', label: 'Time Series', icon: Activity, badge: timeSeriesCount },
     { id: 'buckets', label: 'KV Buckets', icon: Database, badge: bucketCount },
     { id: 'queues', label: 'Task Queues', icon: Package, badge: queueCount },
     { id: 'pubsub', label: 'Real-Time Pub/Sub', icon: Radio },

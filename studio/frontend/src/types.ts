@@ -29,6 +29,12 @@ export interface CatalogData {
   queues?: CatalogObject[]
 }
 
+export interface TimeSeriesPoint {
+  Timestamp: string
+  Tags: Record<string, string>
+  Fields: Record<string, any>
+}
+
 export interface KVEntry {
   key: string
   value: string
