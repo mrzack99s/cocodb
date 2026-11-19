@@ -79,7 +79,7 @@ func (tx *Tx) Bucket(name string) *kv.Bucket {
 		objID = obj.ID
 	}
 
-	tree := tx.db.getOrOpenTree(root)
+	tree := tx.db.getOrOpenTree(objID, root)
 	b := kv.NewBucket(name, objID, tree, tx.internalTx, tx.db.ttlIndex)
 	tx.buckets[name] = b
 	return b
@@ -187,6 +187,7 @@ func (tx *Tx) Rollback() error {
 		return nil
 	}
 	err := tx.internalTx.Rollback()
+
 	for _, child := range tx.childTxs {
 		_ = child.Rollback()
 	}

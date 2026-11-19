@@ -42,7 +42,7 @@ type DB struct {
 	store           *record.Store
 	ttlIndex        *index.TTLIndex
 	scheduler       *maintenance.Scheduler
-	trees           map[types.PageID]*btree.BTree
+	trees           map[types.ObjectID]*btree.BTree // keyed by catalog object id, see getOrOpenTree
 	colDicts        map[string]*cson.FieldDictionary
 	queues          map[string]*queue.Queue
 	pubsub          *pubsub.PubSub
@@ -166,7 +166,7 @@ func Open(path string, opts ...Option) (*DB, error) {
 		dir:      dir,
 		store:    store,
 		ttlIndex: ttlIndex,
-		trees:    make(map[types.PageID]*btree.BTree),
+		trees:    make(map[types.ObjectID]*btree.BTree),
 		colDicts: make(map[string]*cson.FieldDictionary),
 		queues:   make(map[string]*queue.Queue),
 		pubsub:   pubsub.New(256),
@@ -257,9 +257,18 @@ func (db *DB) modelDB(model Model) *DB {
 	return db
 }
 
-func (db *DB) getOrOpenTree(root types.PageID) *btree.BTree {
+// getOrOpenTree returns the one B-tree handle shared by every user of a catalog object.
+//
+// Trees are cached by catalog object id, not by root page. Every object that has not
+// been written yet has the root InvalidPageID, so caching by root made all new buckets
+// (and queues) share one tree and see each other's keys.
+func (db *DB) getOrOpenTree(objID types.ObjectID, root types.PageID) *btree.BTree {
+	if objID == types.InvalidObjectID {
+		// Not in the catalog (a missing object seen by a read-only handle): nothing to share.
+		return btree.NewBTree(db.pager, root)
+	}
 	db.mu.RLock()
-	if t, ok := db.trees[root]; ok {
+	if t, ok := db.trees[objID]; ok {
 		db.mu.RUnlock()
 		return t
 	}
@@ -267,12 +276,19 @@ func (db *DB) getOrOpenTree(root types.PageID) *btree.BTree {
 
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	return db.getOrOpenTreeLocked(objID, root)
+}
 
-	if t, ok := db.trees[root]; ok {
+// getOrOpenTreeLocked is getOrOpenTree for callers that already hold db.mu.
+func (db *DB) getOrOpenTreeLocked(objID types.ObjectID, root types.PageID) *btree.BTree {
+	if objID == types.InvalidObjectID {
+		return btree.NewBTree(db.pager, root)
+	}
+	if t, ok := db.trees[objID]; ok {
 		return t
 	}
 	t := btree.NewBTree(db.pager, root)
-	db.trees[root] = t
+	db.trees[objID] = t
 	return t
 }
 
@@ -379,7 +395,7 @@ func (db *DB) Bucket(name string) *kv.Bucket {
 		root = obj.Root
 		objID = obj.ID
 	}
-	tree := db.getOrOpenTree(root)
+	tree := db.getOrOpenTree(objID, root)
 	return kv.NewBucket(name, objID, tree, nil, db.ttlIndex)
 }
 
@@ -462,13 +478,11 @@ func (db *DB) Queue(name string, opts ...queue.Option) *queue.Queue {
 		root = obj.Root
 	}
 
-	var tree *btree.BTree
-	if t, exists := db.trees[root]; exists {
-		tree = t
-	} else {
-		tree = btree.NewBTree(db.pager, root)
-		db.trees[root] = tree
+	var objID types.ObjectID = types.InvalidObjectID
+	if obj != nil {
+		objID = obj.ID
 	}
+	tree := db.getOrOpenTreeLocked(objID, root)
 
 	qCfg := internalQueue.DefaultConfig()
 	qEngine := internalQueue.NewQueueEngine(name, qCfg, tree, db.pager, false)
