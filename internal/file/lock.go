@@ -11,6 +11,11 @@ import (
 var ErrDatabaseLocked = errors.New("coco: database is locked by another process")
 
 // FileLock manages process-level database exclusion using a lock file.
+//
+// The exclusion is an operating-system lock held on the open lock file (flock on Unix,
+// LockFileEx on Windows), not the file's existence. The operating system drops the lock
+// when the process exits for any reason, so a crash, a kill or a power loss never leaves
+// the database locked. A leftover lock file is harmless and is reused.
 type FileLock struct {
 	mu       sync.Mutex
 	lockPath string
@@ -18,7 +23,8 @@ type FileLock struct {
 	locked   bool
 }
 
-// AcquireLock attempts to acquire an exclusive lock for the database path.
+// AcquireLock attempts to acquire an exclusive lock for the database path. It fails with
+// ErrDatabaseLocked when another process, or another open handle in this process, holds it.
 func AcquireLock(dbPath string) (*FileLock, error) {
 	if dbPath == ":memory:" || dbPath == "" {
 		return &FileLock{locked: true}, nil
@@ -28,18 +34,23 @@ func AcquireLock(dbPath string) (*FileLock, error) {
 		return nil, err
 	}
 
-	// Try to open exclusively
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
-		if os.IsExist(err) {
-			return nil, fmt.Errorf("%w: %s", ErrDatabaseLocked, lockPath)
-		}
 		return nil, err
 	}
+	if err := lockFile(f); err != nil {
+		_ = f.Close()
+		if errors.Is(err, errWouldBlock) {
+			return nil, fmt.Errorf("%w: %s", ErrDatabaseLocked, lockPath)
+		}
+		return nil, fmt.Errorf("lock %s: %w", lockPath, err)
+	}
 
-	pid := os.Getpid()
-	fmt.Fprintf(f, "%d\n", pid)
-	_ = f.Sync()
+	// The owner's pid, for people looking at the file. It plays no part in locking.
+	if err := f.Truncate(0); err == nil {
+		_, _ = f.WriteAt([]byte(fmt.Sprintf("%d\n", os.Getpid())), 0)
+		_ = f.Sync()
+	}
 
 	return &FileLock{
 		lockPath: lockPath,
@@ -48,7 +59,9 @@ func AcquireLock(dbPath string) (*FileLock, error) {
 	}, nil
 }
 
-// Release releases the lock and removes the lock file.
+// Release releases the lock. The lock file is left in place: removing it would let a
+// process that opened the old file and a process that creates a new one both believe
+// they hold the lock.
 func (l *FileLock) Release() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -56,10 +69,10 @@ func (l *FileLock) Release() error {
 		return nil
 	}
 	l.locked = false
-	_ = l.file.Close()
-	l.file = nil
-	if l.lockPath != "" {
-		_ = os.Remove(l.lockPath)
+	err := unlockFile(l.file)
+	if cerr := l.file.Close(); err == nil {
+		err = cerr
 	}
-	return nil
+	l.file = nil
+	return err
 }
