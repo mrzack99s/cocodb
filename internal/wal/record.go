@@ -27,7 +27,36 @@ const (
 	RecordTxnCommit
 	RecordTxnAbort
 	RecordCheckpoint
+	RecordMeta // structural meta-page fields as of a commit, see MetaRedo
 )
+
+// MetaRedo holds the meta-page fields a commit may change. The pages they point to are
+// logged as RecordPageUpdate in the same transaction, so recovery needs both to find the
+// committed data.
+type MetaRedo struct {
+	CatalogRoot   types.PageID
+	RecordDirRoot types.PageID
+	FreeListRoot  types.PageID
+	NextPageID    types.PageID
+	NextRecordID  types.RecordID
+}
+
+const metaRedoSize = 5 * 8
+
+// NewMetaRecord creates a WAL record carrying the meta-page fields of a commit.
+func NewMetaRecord(txnID types.TxnID, m MetaRedo) *Record {
+	payload := make([]byte, metaRedoSize)
+	binary.BigEndian.PutUint64(payload[0:8], uint64(m.CatalogRoot))
+	binary.BigEndian.PutUint64(payload[8:16], uint64(m.RecordDirRoot))
+	binary.BigEndian.PutUint64(payload[16:24], uint64(m.FreeListRoot))
+	binary.BigEndian.PutUint64(payload[24:32], uint64(m.NextPageID))
+	binary.BigEndian.PutUint64(payload[32:40], uint64(m.NextRecordID))
+	return &Record{
+		Header:  RecordHeader{Type: RecordMeta, TxnID: txnID},
+		Payload: payload,
+		Meta:    &m,
+	}
+}
 
 func (r RecordType) String() string {
 	switch r {
@@ -45,6 +74,8 @@ func (r RecordType) String() string {
 		return "TxnAbort"
 	case RecordCheckpoint:
 		return "Checkpoint"
+	case RecordMeta:
+		return "Meta"
 	default:
 		return fmt.Sprintf("Unknown(%d)", r)
 	}
@@ -70,6 +101,9 @@ type Record struct {
 	PageID   types.PageID
 	PageType storage.PageType
 	PageData []byte
+
+	// Decoded RecordMeta payload
+	Meta *MetaRedo
 }
 
 // Encode serializes a Record into a byte slice, encrypting the payload if encKey is provided.
@@ -166,6 +200,16 @@ func DecodeRecord(reader io.Reader, encKeys ...[]byte) (*Record, error) {
 	case RecordPageFree:
 		if len(payload) >= 8 {
 			rec.PageID = types.PageID(binary.BigEndian.Uint64(payload[0:8]))
+		}
+	case RecordMeta:
+		if len(payload) >= metaRedoSize {
+			rec.Meta = &MetaRedo{
+				CatalogRoot:   types.PageID(binary.BigEndian.Uint64(payload[0:8])),
+				RecordDirRoot: types.PageID(binary.BigEndian.Uint64(payload[8:16])),
+				FreeListRoot:  types.PageID(binary.BigEndian.Uint64(payload[16:24])),
+				NextPageID:    types.PageID(binary.BigEndian.Uint64(payload[24:32])),
+				NextRecordID:  types.RecordID(binary.BigEndian.Uint64(payload[32:40])),
+			}
 		}
 	}
 

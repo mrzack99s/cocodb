@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/mrzack99s/cocodb/internal/types"
@@ -45,6 +46,30 @@ func (p *DefaultPager) BeginJournal() {
 		created: make(map[types.PageID]bool),
 		meta:    meta,
 	})
+}
+
+// ChangedPages returns every page the open write transaction created or changed, so
+// the commit can write all of them to the WAL. Pages it only read are left out.
+func (p *DefaultPager) ChangedPages() []*Page {
+	j := p.journal.Load()
+	if j == nil {
+		return nil
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	out := make([]*Page, 0, len(j.before)+len(j.created))
+	for _, img := range j.before {
+		if !bytes.Equal(img.data, img.page.Data) {
+			out = append(out, img.page)
+		}
+	}
+	for id := range j.created {
+		if pg := p.cache.Get(id); pg != nil {
+			p.cache.Unpin(id)
+			out = append(out, pg)
+		}
+	}
+	return out
 }
 
 // CommitJournal discards the undo information after a commit.

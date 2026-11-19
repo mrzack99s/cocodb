@@ -31,6 +31,7 @@ func Recover(walManager *WAL, pager storage.Pager) (*RecoveryResult, error) {
 	// Phase 1: Identify all committed transactions
 	committedTxns := make(map[types.TxnID]bool)
 	var maxLSN types.LSN
+	var maxCommitted types.TxnID
 
 	for _, rec := range records {
 		if rec.Header.LSN > maxLSN {
@@ -38,6 +39,9 @@ func Recover(walManager *WAL, pager storage.Pager) (*RecoveryResult, error) {
 		}
 		if rec.Header.Type == RecordTxnCommit {
 			committedTxns[rec.Header.TxnID] = true
+			if rec.Header.TxnID > maxCommitted {
+				maxCommitted = rec.Header.TxnID
+			}
 		}
 	}
 	result.TxnsCommitted = len(committedTxns)
@@ -45,6 +49,21 @@ func Recover(walManager *WAL, pager storage.Pager) (*RecoveryResult, error) {
 
 	// Phase 2: Redo committed updates in LSN order
 	for _, rec := range records {
+		if rec.Header.Type == RecordMeta && rec.Meta != nil && committedTxns[rec.Header.TxnID] {
+			// The roots of the catalog and record directory, and the allocation state,
+			// as of this commit. Without them the redone pages would be unreachable.
+			meta := pager.Meta()
+			meta.CatalogRoot = rec.Meta.CatalogRoot
+			meta.RecordDirRoot = rec.Meta.RecordDirRoot
+			meta.FreeListRoot = rec.Meta.FreeListRoot
+			if rec.Meta.NextPageID > meta.NextPageID {
+				meta.NextPageID = rec.Meta.NextPageID
+			}
+			if rec.Meta.NextRecordID > meta.NextRecordID {
+				meta.NextRecordID = rec.Meta.NextRecordID
+			}
+			continue
+		}
 		if rec.Header.Type == RecordPageUpdate {
 			if committedTxns[rec.Header.TxnID] {
 				if len(rec.PageData) == int(types.DefaultPageSize) {
@@ -74,6 +93,11 @@ func Recover(walManager *WAL, pager storage.Pager) (*RecoveryResult, error) {
 	meta := pager.Meta()
 	meta.LastLSN = maxLSN
 	meta.LastCheckpointLSN = maxLSN
+	// MVCC treats a record as committed when its transaction id is at most LastTxnID.
+	// Without this the redone records stay invisible, as if never committed.
+	if maxCommitted > meta.LastTxnID {
+		meta.LastTxnID = maxCommitted
+	}
 	if err := pager.SaveMeta(); err != nil {
 		return nil, err
 	}

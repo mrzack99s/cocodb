@@ -185,6 +185,7 @@ func Open(path string, opts ...Option) (*DB, error) {
 			},
 			cfg.CleanInterval,
 		)
+		db.scheduler.SetCheckpointGuard(tm.Checkpoint)
 		db.scheduler.Start()
 	}
 

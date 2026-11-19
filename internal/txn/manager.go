@@ -28,8 +28,19 @@ const (
 // changes (storage.DefaultPager).
 type journaledPager interface {
 	BeginJournal()
+	ChangedPages() []*storage.Page
 	CommitJournal()
 	RollbackJournal()
+}
+
+// Checkpoint runs fn while no write transaction is open. A checkpoint flushes cached
+// pages and truncates the WAL; doing that in the middle of a write transaction would
+// put uncommitted pages in the file and could cut the transaction's records out of the
+// log before its commit record is written.
+func (tm *TxnManager) Checkpoint(fn func() error) error {
+	tm.writeLock.Lock()
+	defer tm.writeLock.Unlock()
+	return fn()
 }
 
 // TxnManager coordinates transactions, MVCC visibility, and single-writer serialization.
@@ -159,9 +170,23 @@ func (tm *TxnManager) Commit(tx *Transaction) error {
 		tm.readerTable.Deregister(tx.snapshotTxn)
 	}()
 
-	// 1. Write PageUpdate records to WAL for each touched page
+	// 1. Write PageUpdate records to WAL for every page the transaction changed: the
+	// record pages it tracked, plus the B+Tree, catalog, directory and free-list pages
+	// the undo journal saw change. Logging only the tracked pages lost every commit made
+	// since the last checkpoint when the process died, because the index pages that point
+	// at the new records never reached the WAL.
+	pages := make(map[types.PageID]*storage.Page, len(tx.dirtyPages))
+	for id, page := range tx.dirtyPages {
+		pages[id] = page
+	}
+	jp, journaled := tm.pager.(journaledPager)
+	if journaled {
+		for _, page := range jp.ChangedPages() {
+			pages[page.Header.ID] = page
+		}
+	}
 	var lastLSN types.LSN
-	for pageID, page := range tx.dirtyPages {
+	for pageID, page := range pages {
 		page.Seal()
 		rec := wal.NewPageUpdateRecord(0, tx.txnID, pageID, page.Data)
 		lsn, err := tm.wal.Append(rec)
@@ -171,6 +196,22 @@ func (tm *TxnManager) Commit(tx *Transaction) error {
 		page.Header.LSN = lsn
 		lastLSN = lsn
 		tm.pager.MarkDirty(page)
+	}
+
+	// The meta-page roots that lead to those pages. They are otherwise written only at a
+	// checkpoint, so recovery needs them from the log.
+	if journaled {
+		m := tm.pager.Meta()
+		metaRec := wal.NewMetaRecord(tx.txnID, wal.MetaRedo{
+			CatalogRoot:   m.CatalogRoot,
+			RecordDirRoot: m.RecordDirRoot,
+			FreeListRoot:  m.FreeListRoot,
+			NextPageID:    m.NextPageID,
+			NextRecordID:  m.NextRecordID,
+		})
+		if _, err := tm.wal.Append(metaRec); err != nil {
+			return fmt.Errorf("wal meta record append failed: %w", err)
+		}
 	}
 
 	// 2. Append TxnCommit record

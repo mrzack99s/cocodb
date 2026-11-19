@@ -21,6 +21,16 @@ type Scheduler struct {
 	interval time.Duration
 	stopCh   chan struct{}
 	running  bool
+	guard    func(fn func() error) error // runs fn with no write transaction open
+}
+
+// SetCheckpointGuard makes each maintenance run wait until no write transaction is open
+// (TxnManager.Checkpoint). Without it a checkpoint could flush a transaction's
+// uncommitted pages and truncate its WAL records before the commit record is written.
+func (s *Scheduler) SetCheckpointGuard(guard func(fn func() error) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.guard = guard
 }
 
 func NewScheduler(
@@ -86,7 +96,13 @@ func (s *Scheduler) loop() {
 func (s *Scheduler) RunOnce(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.guard != nil {
+		return s.guard(s.runOnce)
+	}
+	return s.runOnce()
+}
 
+func (s *Scheduler) runOnce() error {
 	// 1. Clean expired TTL entries
 	if s.ttlIndex != nil && s.deleteFn != nil {
 		expired, err := s.ttlIndex.FindExpired(time.Now(), 100)
