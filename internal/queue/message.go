@@ -53,6 +53,11 @@ type Message struct {
 	CreatedAt  int64 // UnixNano
 	ExpireAt   int64 // UnixNano (0 = no expiration)
 
+	// order is the enqueue sequence within one engine. It breaks ties between messages
+	// with the same priority and VisibleAt, which happen whenever the clock does not
+	// advance between two enqueues (common on Windows), so equal messages stay FIFO.
+	order uint64
+
 	// Callback handlers
 	ackFn    func() error
 	nackFn   func(requeue bool) error

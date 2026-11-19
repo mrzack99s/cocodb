@@ -43,6 +43,7 @@ type QueueEngine struct {
 	pager        storage.Pager
 	notifyCh     chan struct{}
 	msgSeq       atomic.Uint64
+	orderSeq     atomic.Uint64 // FIFO tie-breaker, see Message.order
 	closed       bool
 	stopWorkerCh chan struct{}
 }
@@ -134,6 +135,7 @@ func (q *QueueEngine) Enqueue(msg *Message) (*Message, error) {
 	msg.Queue = q.name
 	msg.CreatedAt = now
 	msg.State = StateReady
+	msg.order = q.orderSeq.Add(1)
 
 	if msg.MaxRetries <= 0 {
 		msg.MaxRetries = q.cfg.DefaultMaxRetries
@@ -432,6 +434,7 @@ func (q *QueueEngine) restoreFromTree() {
 				msg.State = StateReady
 				msg.VisibleAt = time.Now().UnixNano()
 			}
+			msg.order = q.orderSeq.Add(1) // tree order is message-id order
 			heap.Push(&q.readyHeap, msg)
 		}
 		if !cur.Next() {
@@ -450,7 +453,11 @@ func (h priorityHeap) Less(i, j int) bool {
 		return h[i].Priority > h[j].Priority
 	}
 	// Earlier visible time first
-	return h[i].VisibleAt < h[j].VisibleAt
+	if h[i].VisibleAt != h[j].VisibleAt {
+		return h[i].VisibleAt < h[j].VisibleAt
+	}
+	// Then enqueue order, so messages enqueued within one clock tick stay FIFO
+	return h[i].order < h[j].order
 }
 func (h priorityHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
 func (h *priorityHeap) Push(x any)        { *h = append(*h, x.(*Message)) }
