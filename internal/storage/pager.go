@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/mrzack99s/cocodb/internal/crypto"
 	"github.com/mrzack99s/cocodb/internal/file"
 	"github.com/mrzack99s/cocodb/internal/types"
 )
@@ -29,6 +30,8 @@ type Pager interface {
 	Cache() *PageCache
 	Backend() file.Backend
 	SetWALFlusher(fn func(lsn types.LSN) error)
+	WriteRawPage(id types.PageID, data []byte) error
+	IsEncrypted() bool
 }
 
 // DefaultPager implements the Pager interface.
@@ -40,21 +43,38 @@ type DefaultPager struct {
 	meta           *MetaPage
 	activeMetaSlot int // 0 for Meta A (Page 0), 1 for Meta B (Page 1)
 	pageSize       uint32
+	diskPageSize   uint32
+	encKey         []byte
 	readOnly       bool
 	walFlusher     func(lsn types.LSN) error
 }
 
 // OpenPager opens an existing or initializes a new database pager.
-func OpenPager(backend file.Backend, maxCacheBytes int64, readOnly bool) (*DefaultPager, error) {
+func OpenPager(backend file.Backend, maxCacheBytes int64, readOnly bool, encKeys ...[]byte) (*DefaultPager, error) {
 	size, err := backend.Size()
 	if err != nil {
 		return nil, err
 	}
 
+	var key []byte
+	if len(encKeys) > 0 && len(encKeys[0]) > 0 {
+		if len(encKeys[0]) != 32 {
+			return nil, crypto.ErrInvalidKeySize
+		}
+		key = encKeys[0]
+	}
+
+	diskPageSize := types.DefaultPageSize
+	if len(key) == 32 {
+		diskPageSize = types.DefaultPageSize + 28
+	}
+
 	p := &DefaultPager{
-		backend:  backend,
-		pageSize: types.DefaultPageSize,
-		readOnly: readOnly,
+		backend:      backend,
+		pageSize:     types.DefaultPageSize,
+		diskPageSize: diskPageSize,
+		encKey:       key,
+		readOnly:     readOnly,
 	}
 	p.cache = NewPageCache(maxCacheBytes, p.pageSize)
 	p.allocator = NewAllocator(p)
@@ -73,10 +93,22 @@ func OpenPager(backend file.Backend, maxCacheBytes int64, readOnly bool) (*Defau
 		bufA := metaA.Encode(p.pageSize)
 		bufB := metaB.Encode(p.pageSize)
 
+		if len(p.encKey) == 32 {
+			var errEnc error
+			bufA, errEnc = crypto.EncryptPage(bufA, p.encKey, 0)
+			if errEnc != nil {
+				return nil, errEnc
+			}
+			bufB, errEnc = crypto.EncryptPage(bufB, p.encKey, 1)
+			if errEnc != nil {
+				return nil, errEnc
+			}
+		}
+
 		if _, err := backend.WriteAt(bufA, 0); err != nil {
 			return nil, err
 		}
-		if _, err := backend.WriteAt(bufB, int64(p.pageSize)); err != nil {
+		if _, err := backend.WriteAt(bufB, int64(p.diskPageSize)); err != nil {
 			return nil, err
 		}
 		if err := backend.Sync(); err != nil {
@@ -89,21 +121,41 @@ func OpenPager(backend file.Backend, maxCacheBytes int64, readOnly bool) (*Defau
 	}
 
 	// Read both Meta A and Meta B
-	bufA := make([]byte, p.pageSize)
-	bufB := make([]byte, p.pageSize)
+	bufA := make([]byte, p.diskPageSize)
+	bufB := make([]byte, p.diskPageSize)
 
 	_, errA := backend.ReadAt(bufA, 0)
-	_, errB := backend.ReadAt(bufB, int64(p.pageSize))
+	_, errB := backend.ReadAt(bufB, int64(p.diskPageSize))
 
 	var metaA, metaB *MetaPage
 	if errA == nil {
-		metaA, _ = DecodeMetaPage(bufA)
+		rawA := bufA
+		if len(p.encKey) == 32 {
+			decrypted, errDec := crypto.DecryptPage(rawA, p.encKey, 0)
+			if errDec != nil {
+				return nil, fmt.Errorf("%w: meta A decryption failed: %v", crypto.ErrDecryptFailed, errDec)
+			}
+			rawA = decrypted
+		}
+		metaA, _ = DecodeMetaPage(rawA)
 	}
 	if errB == nil {
-		metaB, _ = DecodeMetaPage(bufB)
+		rawB := bufB
+		if len(p.encKey) == 32 {
+			decrypted, errDec := crypto.DecryptPage(rawB, p.encKey, 1)
+			if errDec == nil {
+				rawB = decrypted
+				metaB, _ = DecodeMetaPage(rawB)
+			}
+		} else {
+			metaB, _ = DecodeMetaPage(rawB)
+		}
 	}
 
 	if metaA == nil && metaB == nil {
+		if len(p.encKey) == 32 {
+			return nil, crypto.ErrDecryptFailed
+		}
 		return nil, types.ErrCorruptMeta
 	}
 
@@ -149,6 +201,7 @@ func (p *DefaultPager) SetWALFlusher(fn func(lsn types.LSN) error) {
 
 // Get retrieves a page by ID (checking cache first, then disk).
 func (p *DefaultPager) Get(id types.PageID) (*Page, error) {
+
 	if cached := p.cache.Get(id); cached != nil {
 		return cached, nil
 	}
@@ -161,7 +214,12 @@ func (p *DefaultPager) Get(id types.PageID) (*Page, error) {
 		return cached, nil
 	}
 
-	offset := int64(id) * int64(p.pageSize)
+	offset := int64(id) * int64(p.diskPageSize)
+
+	rawBuf := make([]byte, p.diskPageSize)
+	if _, err := p.backend.ReadAt(rawBuf, offset); err != nil {
+		return nil, fmt.Errorf("%w: reading page %d: %v", types.ErrPageNotFound, id, err)
+	}
 
 	bptr := pagePool.Get().(*[]byte)
 	buf := *bptr
@@ -169,9 +227,15 @@ func (p *DefaultPager) Get(id types.PageID) (*Page, error) {
 		buf = make([]byte, p.pageSize)
 	}
 
-	if _, err := p.backend.ReadAt(buf, offset); err != nil {
-		pagePool.Put(&buf)
-		return nil, fmt.Errorf("%w: reading page %d: %v", types.ErrPageNotFound, id, err)
+	if len(p.encKey) == 32 {
+		decrypted, err := crypto.DecryptPage(rawBuf, p.encKey, uint64(id))
+		if err != nil {
+			pagePool.Put(&buf)
+			return nil, fmt.Errorf("%w: page %d decryption failed: %v", crypto.ErrDecryptFailed, id, err)
+		}
+		copy(buf, decrypted)
+	} else {
+		copy(buf, rawBuf)
 	}
 
 	page := &Page{
@@ -182,6 +246,7 @@ func (p *DefaultPager) Get(id types.PageID) (*Page, error) {
 	page.ReadHeader()
 
 	if !page.ValidateChecksum() {
+		pagePool.Put(&buf)
 		return nil, fmt.Errorf("%w: checksum mismatch on page %d", types.ErrChecksumFailed, id)
 	}
 
@@ -225,8 +290,18 @@ func (p *DefaultPager) Flush(id types.PageID) error {
 	}
 
 	page.Seal()
-	offset := int64(id) * int64(p.pageSize)
-	if _, err := p.backend.WriteAt(page.Data, offset); err != nil {
+	offset := int64(id) * int64(p.diskPageSize)
+
+	dataToWrite := page.Data
+	if len(p.encKey) == 32 {
+		encrypted, err := crypto.EncryptPage(page.Data, p.encKey, uint64(id))
+		if err != nil {
+			return fmt.Errorf("page %d encryption failed: %w", id, err)
+		}
+		dataToWrite = encrypted
+	}
+
+	if _, err := p.backend.WriteAt(dataToWrite, offset); err != nil {
 		return err
 	}
 	page.Dirty = false
@@ -259,7 +334,16 @@ func (p *DefaultPager) SaveMeta() error {
 	p.meta.Generation++
 	nextSlot := 1 - p.activeMetaSlot
 	buf := p.meta.Encode(p.pageSize)
-	offset := int64(nextSlot) * int64(p.pageSize)
+
+	if len(p.encKey) == 32 {
+		var err error
+		buf, err = crypto.EncryptPage(buf, p.encKey, uint64(nextSlot))
+		if err != nil {
+			return fmt.Errorf("meta page slot %d encryption failed: %w", nextSlot, err)
+		}
+	}
+
+	offset := int64(nextSlot) * int64(p.diskPageSize)
 
 	if _, err := p.backend.WriteAt(buf, offset); err != nil {
 		return err
@@ -270,6 +354,28 @@ func (p *DefaultPager) SaveMeta() error {
 
 	p.activeMetaSlot = nextSlot
 	return nil
+}
+
+// WriteRawPage writes raw page data directly to disk (encrypting if enabled).
+func (p *DefaultPager) WriteRawPage(id types.PageID, data []byte) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	offset := int64(id) * int64(p.diskPageSize)
+	dataToWrite := data
+	if len(p.encKey) == 32 {
+		encrypted, err := crypto.EncryptPage(data, p.encKey, uint64(id))
+		if err != nil {
+			return fmt.Errorf("raw page %d encryption failed: %w", id, err)
+		}
+		dataToWrite = encrypted
+	}
+	_, err := p.backend.WriteAt(dataToWrite, offset)
+	return err
+}
+
+func (p *DefaultPager) IsEncrypted() bool {
+	return len(p.encKey) == 32
 }
 
 func (p *DefaultPager) Close() error {

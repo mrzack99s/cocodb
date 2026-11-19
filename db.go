@@ -83,7 +83,7 @@ func Open(path string, opts ...Option) (*DB, error) {
 		return nil, err
 	}
 
-	pager, err := storage.OpenPager(backend, cfg.MemoryLimit, cfg.ReadOnly)
+	pager, err := storage.OpenPager(backend, cfg.MemoryLimit, cfg.ReadOnly, cfg.EncryptionKey)
 	if err != nil {
 		_ = backend.Close()
 		if lock != nil {
@@ -106,7 +106,7 @@ func Open(path string, opts ...Option) (*DB, error) {
 		return nil, err
 	}
 
-	walManager, err := wal.OpenWAL(walBackend, pager.Meta().LastLSN)
+	walManager, err := wal.OpenWAL(walBackend, pager.Meta().LastLSN, cfg.EncryptionKey)
 	if err != nil {
 		_ = walBackend.Close()
 		_ = pager.Close()

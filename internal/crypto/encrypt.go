@@ -97,3 +97,86 @@ func DecryptPage(envelope []byte, key []byte, pageID uint64) ([]byte, error) {
 
 	return plaintext, nil
 }
+
+// EncryptWAL encrypts arbitrary WAL payload slice using AES-256-GCM binding LSN as AAD.
+func EncryptWAL(plain []byte, key []byte, lsn uint64) ([]byte, error) {
+	if len(key) != 32 {
+		return nil, ErrInvalidKeySize
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	aad := make([]byte, 8)
+	aad[0] = byte(lsn >> 56)
+	aad[1] = byte(lsn >> 48)
+	aad[2] = byte(lsn >> 40)
+	aad[3] = byte(lsn >> 32)
+	aad[4] = byte(lsn >> 24)
+	aad[5] = byte(lsn >> 16)
+	aad[6] = byte(lsn >> 8)
+	aad[7] = byte(lsn)
+
+	ciphertext := gcm.Seal(nil, nonce, plain, aad)
+
+	envelope := make([]byte, len(nonce)+len(ciphertext))
+	copy(envelope, nonce)
+	copy(envelope[len(nonce):], ciphertext)
+
+	return envelope, nil
+}
+
+// DecryptWAL decrypts and authenticates a WAL payload envelope using AES-256-GCM binding LSN as AAD.
+func DecryptWAL(envelope []byte, key []byte, lsn uint64) ([]byte, error) {
+	if len(key) != 32 {
+		return nil, ErrInvalidKeySize
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(envelope) < nonceSize {
+		return nil, fmt.Errorf("%w: wal envelope too short", ErrDecryptFailed)
+	}
+
+	nonce := envelope[:nonceSize]
+	ciphertext := envelope[nonceSize:]
+
+	aad := make([]byte, 8)
+	aad[0] = byte(lsn >> 56)
+	aad[1] = byte(lsn >> 48)
+	aad[2] = byte(lsn >> 40)
+	aad[3] = byte(lsn >> 32)
+	aad[4] = byte(lsn >> 24)
+	aad[5] = byte(lsn >> 16)
+	aad[6] = byte(lsn >> 8)
+	aad[7] = byte(lsn)
+
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, aad)
+	if err != nil {
+		return nil, fmt.Errorf("%w: wal %v", ErrDecryptFailed, err)
+	}
+
+	return plaintext, nil
+}
+

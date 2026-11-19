@@ -48,9 +48,8 @@ func Recover(walManager *WAL, pager storage.Pager) (*RecoveryResult, error) {
 		if rec.Header.Type == RecordPageUpdate {
 			if committedTxns[rec.Header.TxnID] {
 				if len(rec.PageData) == int(types.DefaultPageSize) {
-					// Write raw page directly to backend
-					offset := int64(rec.PageID) * int64(types.DefaultPageSize)
-					if _, err := pager.Backend().WriteAt(rec.PageData, offset); err == nil {
+					// Write raw page directly through pager (handles encryption transparently)
+					if err := pager.WriteRawPage(rec.PageID, rec.PageData); err == nil {
 						if rec.PageID >= pager.Meta().NextPageID {
 							pager.Meta().NextPageID = rec.PageID + 1
 						}

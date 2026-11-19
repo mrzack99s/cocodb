@@ -22,17 +22,28 @@ type Store struct {
 }
 
 func NewStore(pager storage.Pager, dir *Directory, tm *txn.TxnManager) *Store {
+	nextID := uint64(1000)
+	if pager != nil && pager.Meta() != nil {
+		storedID := atomic.LoadUint64((*uint64)(&pager.Meta().NextRecordID))
+		if storedID > nextID {
+			nextID = storedID
+		}
+	}
 	return &Store{
 		pager:       pager,
 		directory:   dir,
 		manager:     tm,
-		nextID:      1000,
+		nextID:      nextID,
 		activePages: make([]*storage.Page, 0),
 	}
 }
 
+
 func (s *Store) allocateID() types.RecordID {
 	id := atomic.AddUint64(&s.nextID, 1)
+	if s.pager != nil && s.pager.Meta() != nil {
+		atomic.StoreUint64((*uint64)(&s.pager.Meta().NextRecordID), id)
+	}
 	return types.RecordID(id)
 }
 

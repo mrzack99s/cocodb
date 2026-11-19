@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/mrzack99s/cocodb/internal/crypto"
 	"github.com/mrzack99s/cocodb/internal/file"
 	"github.com/mrzack99s/cocodb/internal/types"
 )
@@ -16,13 +17,22 @@ type WAL struct {
 	lastLSN    types.LSN
 	durableLSN types.LSN
 	offset     int64
+	encKey     []byte
 }
 
 // OpenWAL opens or creates a WAL manager on top of a file backend.
-func OpenWAL(backend file.Backend, lastLSN types.LSN) (*WAL, error) {
+func OpenWAL(backend file.Backend, lastLSN types.LSN, encKeys ...[]byte) (*WAL, error) {
 	size, err := backend.Size()
 	if err != nil {
 		return nil, err
+	}
+
+	var key []byte
+	if len(encKeys) > 0 && len(encKeys[0]) > 0 {
+		if len(encKeys[0]) != 32 {
+			return nil, crypto.ErrInvalidKeySize
+		}
+		key = encKeys[0]
 	}
 
 	w := &WAL{
@@ -30,6 +40,7 @@ func OpenWAL(backend file.Backend, lastLSN types.LSN) (*WAL, error) {
 		lastLSN:    lastLSN,
 		durableLSN: lastLSN,
 		offset:     size,
+		encKey:     key,
 	}
 	return w, nil
 }
@@ -64,7 +75,7 @@ func (w *WAL) Append(rec *Record) (types.LSN, error) {
 	w.lastLSN++
 	rec.Header.LSN = w.lastLSN
 
-	data := rec.Encode()
+	data := rec.Encode(w.encKey)
 	if _, err := w.backend.WriteAt(data, w.offset); err != nil {
 		return 0, err
 	}
@@ -134,7 +145,7 @@ func (w *WAL) ReadAll() ([]*Record, error) {
 	var records []*Record
 
 	for {
-		rec, err := DecodeRecord(reader)
+		rec, err := DecodeRecord(reader, w.encKey)
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				break

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mrzack99s/cocodb/internal/crypto"
 	"github.com/mrzack99s/cocodb/internal/storage"
 	"github.com/mrzack99s/cocodb/internal/types"
 )
@@ -71,14 +72,23 @@ type Record struct {
 	PageData []byte
 }
 
-// Encode serializes a Record into a byte slice.
-func (r *Record) Encode() []byte {
+// Encode serializes a Record into a byte slice, encrypting the payload if encKey is provided.
+func (r *Record) Encode(encKeys ...[]byte) []byte {
 	r.Header.Magic = WALMagic
 	r.Header.Version = WALVersion
-	r.Header.Length = uint32(len(r.Payload))
-	r.Header.CRC = storage.Checksum(r.Payload)
 
-	buf := make([]byte, WALRecordHeaderSize+len(r.Payload))
+	payloadToWrite := r.Payload
+	if len(encKeys) > 0 && len(encKeys[0]) == 32 {
+		encrypted, err := crypto.EncryptWAL(r.Payload, encKeys[0], uint64(r.Header.LSN))
+		if err == nil {
+			payloadToWrite = encrypted
+		}
+	}
+
+	r.Header.Length = uint32(len(payloadToWrite))
+	r.Header.CRC = storage.Checksum(payloadToWrite)
+
+	buf := make([]byte, WALRecordHeaderSize+len(payloadToWrite))
 	binary.BigEndian.PutUint32(buf[0:4], r.Header.Magic)
 	binary.BigEndian.PutUint16(buf[4:6], r.Header.Version)
 	buf[6] = byte(r.Header.Type)
@@ -87,12 +97,12 @@ func (r *Record) Encode() []byte {
 	binary.BigEndian.PutUint64(buf[19:27], uint64(r.Header.TxnID))
 	binary.BigEndian.PutUint32(buf[27:31], r.Header.CRC)
 
-	copy(buf[31:], r.Payload)
+	copy(buf[31:], payloadToWrite)
 	return buf
 }
 
-// DecodeRecord decodes a single WAL record from a reader.
-func DecodeRecord(reader io.Reader) (*Record, error) {
+// DecodeRecord decodes a single WAL record from a reader, decrypting payload if key is supplied.
+func DecodeRecord(reader io.Reader, encKeys ...[]byte) (*Record, error) {
 	headerBuf := make([]byte, WALRecordHeaderSize)
 	if _, err := io.ReadFull(reader, headerBuf); err != nil {
 		return nil, err
@@ -109,14 +119,23 @@ func DecodeRecord(reader io.Reader) (*Record, error) {
 	txnID := types.TxnID(binary.BigEndian.Uint64(headerBuf[19:27]))
 	crc := binary.BigEndian.Uint32(headerBuf[27:31])
 
-	payload := make([]byte, length)
-	if _, err := io.ReadFull(reader, payload); err != nil {
+	rawPayload := make([]byte, length)
+	if _, err := io.ReadFull(reader, rawPayload); err != nil {
 		return nil, err
 	}
 
-	computedCRC := storage.Checksum(payload)
+	computedCRC := storage.Checksum(rawPayload)
 	if crc != computedCRC {
 		return nil, types.ErrChecksumFailed
+	}
+
+	payload := rawPayload
+	if len(encKeys) > 0 && len(encKeys[0]) == 32 {
+		decrypted, err := crypto.DecryptWAL(rawPayload, encKeys[0], uint64(lsn))
+		if err != nil {
+			return nil, fmt.Errorf("%w: decrypt wal record lsn %d: %v", crypto.ErrDecryptFailed, lsn, err)
+		}
+		payload = decrypted
 	}
 
 	rec := &Record{
