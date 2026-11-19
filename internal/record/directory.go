@@ -33,6 +33,11 @@ func (d *Directory) Root() types.PageID {
 	return d.tree.Root()
 }
 
+// ResetRoot points the directory at root again, after a rollback restored the pages.
+func (d *Directory) ResetRoot(root types.PageID) {
+	d.tree.SetRoot(root)
+}
+
 // Put records or updates the physical location for recordID.
 func (d *Directory) Put(id types.RecordID, loc Location) error {
 	var kBuf [9]byte

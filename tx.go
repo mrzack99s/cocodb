@@ -17,6 +17,7 @@ type Tx struct {
 	buckets     map[string]*kv.Bucket
 	collections map[string]*document.Collection
 	childTxs    map[*DB]*Tx
+	ttlRoot     types.PageID // TTL index root when a write transaction began
 }
 
 func (tx *Tx) childTx(target *DB) (*Tx, error) {
@@ -186,8 +187,12 @@ func (tx *Tx) Rollback() error {
 	if tx.internalTx == nil {
 		return nil
 	}
+	wasWrite := !tx.internalTx.ReadOnly()
 	err := tx.internalTx.Rollback()
-
+	if wasWrite {
+		// The pager restored the pages; bring in-memory structures back in line with them.
+		tx.db.reloadAfterRollback(tx.ttlRoot)
+	}
 	for _, child := range tx.childTxs {
 		_ = child.Rollback()
 	}

@@ -28,6 +28,11 @@ func (idx *TTLIndex) Root() types.PageID {
 	return idx.tree.Root()
 }
 
+// SetRoot points the index at root again, after a rollback restored the pages.
+func (idx *TTLIndex) SetRoot(root types.PageID) {
+	idx.tree.SetRoot(root)
+}
+
 func (idx *TTLIndex) makeKey(expireAt time.Time, objectID types.ObjectID, keyOrID []byte) []byte {
 	timeKey := btree.EncodeTime(expireAt)
 	objKey := btree.EncodeUint64(uint64(objectID))

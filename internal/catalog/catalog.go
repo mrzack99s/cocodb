@@ -53,6 +53,42 @@ func NewCatalog(pager storage.Pager, root types.PageID) (*Catalog, error) {
 	return c, nil
 }
 
+// Reload re-reads every object from the catalog tree at root, after a rollback restored
+// the pages. Object ids are not handed out again.
+func (c *Catalog) Reload(root types.PageID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.tree.SetRoot(root)
+	c.objects = make(map[string]*Object)
+	if root == types.InvalidPageID {
+		return
+	}
+	cur := btree.NewCursor(c.tree)
+	defer cur.Close()
+	for ok := cur.First(); ok && cur.Valid(); ok = cur.Next() {
+		obj, err := DecodeObject(cur.Value())
+		if err != nil {
+			continue
+		}
+		c.objects[fmt.Sprintf("%d:%s", obj.Type, obj.Name)] = obj
+		if obj.ID >= c.nextOID {
+			c.nextOID = obj.ID + 1
+		}
+	}
+}
+
+// ObjectByID returns the object with id, if any.
+func (c *Catalog) ObjectByID(id types.ObjectID) (*Object, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, obj := range c.objects {
+		if obj.ID == id {
+			return obj, true
+		}
+	}
+	return nil, false
+}
+
 // Root returns the catalog root PageID.
 func (c *Catalog) Root() types.PageID {
 	return c.tree.Root()

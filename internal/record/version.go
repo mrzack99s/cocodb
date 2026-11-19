@@ -38,6 +38,11 @@ func NewStore(pager storage.Pager, dir *Directory, tm *txn.TxnManager) *Store {
 	}
 }
 
+// ResetActivePages forgets the pages kept for appending records. After a rollback they
+// may be pages the aborted transaction created, which are no longer part of the file.
+func (s *Store) ResetActivePages() {
+	s.activePages = s.activePages[:0]
+}
 
 func (s *Store) allocateID() types.RecordID {
 	id := atomic.AddUint64(&s.nextID, 1)

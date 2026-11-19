@@ -41,6 +41,7 @@ func (a *Allocator) Allocate(pageType PageType) (*Page, error) {
 						meta.FreeListRoot = next
 					}
 					// Initialize reused page
+					a.pager.markCreated(reusedID)
 					reused := NewPage(reusedID, pageType)
 					a.pager.Cache().Put(reused)
 					a.pager.MarkDirty(reused)
@@ -54,6 +55,7 @@ func (a *Allocator) Allocate(pageType PageType) (*Page, error) {
 	newID := meta.NextPageID
 	meta.NextPageID++
 
+	a.pager.markCreated(newID)
 	page := NewPage(newID, pageType)
 	a.pager.Cache().Put(page)
 	a.pager.MarkDirty(page)
@@ -66,6 +68,9 @@ func (a *Allocator) Free(id types.PageID) error {
 	defer a.mu.Unlock()
 
 	meta := a.pager.Meta()
+
+	// The freed page is replaced by a new Page object below; keep its before-image.
+	a.pager.captureID(id)
 
 	if meta.FreeListRoot == types.InvalidPageID {
 		// Allocate a new FreeListPage using the freed page itself

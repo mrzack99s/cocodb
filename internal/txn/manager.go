@@ -24,6 +24,14 @@ const (
 	SyncOff
 )
 
+// journaledPager is implemented by pagers that can undo a write transaction's page
+// changes (storage.DefaultPager).
+type journaledPager interface {
+	BeginJournal()
+	CommitJournal()
+	RollbackJournal()
+}
+
 // TxnManager coordinates transactions, MVCC visibility, and single-writer serialization.
 type TxnManager struct {
 	mu            sync.RWMutex
@@ -109,6 +117,10 @@ func (tm *TxnManager) Begin(readOnly bool) (*Transaction, error) {
 
 	tm.readerTable.Register(snapshot)
 
+	if jp, ok := tm.pager.(journaledPager); ok {
+		jp.BeginJournal()
+	}
+
 	return &Transaction{
 		manager:      tm,
 		readOnly:     false,
@@ -137,6 +149,9 @@ func (tm *TxnManager) Commit(tx *Transaction) error {
 	}
 
 	defer func() {
+		if jp, ok := tm.pager.(journaledPager); ok {
+			jp.CommitJournal()
+		}
 		if tx.isWriterHeld {
 			tx.isWriterHeld = false
 			tm.writeLock.Unlock()
@@ -223,7 +238,13 @@ func (tm *TxnManager) Rollback(tx *Transaction) error {
 	abortRec := wal.NewTxnAbortRecord(0, tx.txnID)
 	_, _ = tm.wal.Append(abortRec)
 
-	// Invalidate / evict modified pages from cache so dirty uncommitted mutations vanish
+	// Undo every page the transaction changed, including B+Tree, catalog and free-list
+	// pages that it did not track. Evicting only the tracked record pages left those
+	// changes in the cache, where they hid committed data and later reached the file.
+	if jp, ok := tm.pager.(journaledPager); ok {
+		jp.RollbackJournal()
+		return nil
+	}
 	for pageID := range tx.dirtyPages {
 		tm.pager.Cache().Remove(pageID)
 	}

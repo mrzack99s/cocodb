@@ -370,8 +370,34 @@ func (db *DB) Begin(readOnly bool) (*Tx, error) {
 	tx.buckets = nil
 	tx.collections = nil
 	tx.childTxs = nil
+	tx.ttlRoot = types.InvalidPageID
+	if !readOnly && db.ttlIndex != nil {
+		tx.ttlRoot = db.ttlIndex.Root()
+	}
 
 	return tx, nil
+}
+
+// reloadAfterRollback re-reads the in-memory structures that mirror page contents, after
+// the pager restored the pages a rolled-back write transaction had changed.
+func (db *DB) reloadAfterRollback(ttlRoot types.PageID) {
+	meta := db.pager.Meta()
+	db.catalog.Reload(meta.CatalogRoot)
+	db.dir.ResetRoot(meta.RecordDirRoot)
+	db.store.ResetActivePages()
+	if db.ttlIndex != nil {
+		db.ttlIndex.SetRoot(ttlRoot)
+	}
+
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	for id, tree := range db.trees {
+		if obj, ok := db.catalog.ObjectByID(id); ok {
+			tree.SetRoot(obj.Root)
+		} else {
+			delete(db.trees, id) // created by the rolled-back transaction
+		}
+	}
 }
 
 // Bucket returns a Bucket helper for quick point operations.

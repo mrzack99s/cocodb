@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mrzack99s/cocodb/internal/crypto"
 	"github.com/mrzack99s/cocodb/internal/file"
@@ -47,6 +48,7 @@ type DefaultPager struct {
 	encKey         []byte
 	readOnly       bool
 	walFlusher     func(lsn types.LSN) error
+	journal        atomic.Pointer[journal] // open undo journal of the active write transaction, see journal.go
 }
 
 // OpenPager opens an existing or initializes a new database pager.
@@ -201,7 +203,14 @@ func (p *DefaultPager) SetWALFlusher(fn func(lsn types.LSN) error) {
 
 // Get retrieves a page by ID (checking cache first, then disk).
 func (p *DefaultPager) Get(id types.PageID) (*Page, error) {
+	page, err := p.get(id)
+	if err == nil {
+		p.capture(page)
+	}
+	return page, err
+}
 
+func (p *DefaultPager) get(id types.PageID) (*Page, error) {
 	if cached := p.cache.Get(id); cached != nil {
 		return cached, nil
 	}
